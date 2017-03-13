@@ -35,7 +35,7 @@ function git(path = pwd(), suffix = ".jl")
 	try run(`git remote add $folder git@github.com:AStupidBear/$folder$suffix.git`) end
 	try run(`git pull $folder master`) end
 	run(`git add .`)
-	run(`git commit -m "$(now())"`)
+	try run(`git commit -m "$(now())"`) end
 	run(`git push $folder master`)
 	run(`git remote remove $folder`)
 end
