@@ -18,12 +18,6 @@ using StatsBase
 @reexport using Logging
 
 using PyCall
-# @reexport using Plots
-# @reexport using StatPlots
-
-# import Base: +, -
-# +(f::Function, a::Number) = x->(f(x) + a)
-# -(f::Function) = x->-f(x)
 
 export git
 function git(path = pwd(), suffix = ".jl")
@@ -35,7 +29,7 @@ function git(path = pwd(), suffix = ".jl")
 	try run(`git remote add $folder git@github.com:AStupidBear/$folder$suffix.git`) end
 	try run(`git pull $folder master`) end
 	run(`git add .`)
-	try run(`git commit -m "$(now())"`) end
+	try run(`git commit -m $(now())`) end
 	run(`git push $folder master`)
 	run(`git remote remove $folder`)
 end
@@ -281,7 +275,7 @@ end
 export tempfile
 """write(tempfile("hihi.txt"), "12")"""
 function tempfile(fn)
-  date = @> string(now())[1:16] replace(":", "-")
+  date = @> string(now())[1:13] replace(":", "-")
   name, ext = splitfile(fn)
   joinpath(tempdir(), date * "_" * name * "." *ext)
 end
@@ -1809,5 +1803,9 @@ end
 # end
 #
 # end
+
+# import Base: +, -
+# +(f::Function, a::Number) = x->(f(x) + a)
+# -(f::Function) = x->-f(x)
 
 end # End of Utils

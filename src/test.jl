@@ -3,6 +3,21 @@ src = "/cygdrive/C/Users/AStupidBear/Documents/Codes"
 dst = "luyao@60.210.253.206:/cygdrive/C/Users/luyao/Documents/"
 rsync(src, dst)
 
+function git(path = pwd(), suffix = ".jl")
+	folder = splitdir(path)[end]
+	cd(path)
+  run(`git config --global user.name "Yao Lu"`)
+  run(`git config --global user.email "luyaocns@gmail.com"`)
+	run(`git init`)
+  @show str = `git remote add $folder git@github.com:AStupidBear/$folder$suffix.git`
+	try run(str) end
+	try run(`git pull $folder master`) end
+	run(`git add .`)
+	try run(`git commit -m $(now())`) end
+	run(`git push $folder master`)
+	run(`git remote remove $folder`)
+end
+
 # @step gcd(1,2)
 #
 # using Utils
