@@ -19,8 +19,17 @@ using StatsBase
 
 using PyCall
 
-export git
-function git(path = pwd(), suffix = ".jl")
+
+export plus, minus
+plus(x::Real) = ifelse(x > 0, one(x), zero(x))
+minus(x::Real) = ifelse(x < 0, oftype(x, -1), zero(x))
+
+export splat
+splat(x) = @as _ x collect.(_) vec.(_) vcat(_...)
+
+export git, jgit
+jgit() = git(pwd(), ".jl")
+function git(path = pwd(), suffix = "")
 	folder = splitdir(path)[end]
 	cd(path)
   run(`git config --global user.name "Yao Lu"`)
@@ -35,16 +44,17 @@ function git(path = pwd(), suffix = ".jl")
 end
 
 export typename
-typename{T}(x::T) = string(T.name)
+function typename{T}(x::T)
+  name, ext = splitext(string(T.name))
+  isempty(ext) ? name : ext[2:end]
+end
 
 export proxy
 function proxy(url)
   regKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
   run(`powershell Set-ItemProperty -path \"$regKey\" AutoConfigURL -Value $url`)
 end
-
 cow() = proxy("http://127.0.0.1:7777/pac")
-
 
 function linux_backup(dir = "/home/hdd1/YaoLu/Software", user = "luyao")
   date = string(now())[1:10]
@@ -72,7 +82,7 @@ memory(x) = Base.summarysize(x) / 1024^2
 export cron
 """cron("spam.jl", 1)"""
 function cron(fn, repeat)
-  name, ext = splitfile(fn)
+  name = splitext(fn)[1]
   vb = """
   DIM objShell
   set objShell=wscript.createObject("wscript.shell")
@@ -86,8 +96,6 @@ function cron(fn, repeat)
   write("task.bat", bat)
   run(`task.bat`)
 end
-
-
 
 export @debug, @info
 macro debug(ex)
@@ -110,7 +118,6 @@ macro replace(ex)
             push!(typs, sym.args[2])
         end
     end
-
     for (typ,n) in zip(typs, names)
         for f in fieldnames(eval(current_module(),typ))
             exreplace!(ex.args[2], :($f), :($n.$f))
@@ -134,10 +141,13 @@ macro undict(d, exs...)
   esc(blk)
 end
 
-"vcat(([1,2,3],[4,5,6]), ([1,2,3], [4,5,6]))"
+"""
+	X = [([1,2,3],[4,5,6]), ([1,2,3], [4,5,6])]
+	vcat(X) == vcat(X...)
+"""
 function Base.vcat(X::Tuple...)
   ntuple(length(X[1])) do j
-    mapreduce(i->X[i][j], vcat, 1:length(X))
+    mapreduce(i -> X[i][j], vcat, 1:length(X))
   end
 end
 
@@ -264,21 +274,13 @@ function centralize!(x, dim=1)
   x .= (x .- _min) ./ (_max .- _min)
   x .= 2 .* x .- 1
 end
-centralize(x, dim=1) = centralize!(deepcopy(x), dim)
+centralize(x, dim = 1) = centralize!(deepcopy(x), dim)
 
-export splitfile
-function splitfile(fn)::Tuple{String, String}
-  _ = split(fn, '.')
-  length(_) > 1 ? (_...) : (fn, "")
-end
+export minute
+minute() = @> string(now())[1:16] replace(":", "-")
 
-export tempfile
-"""write(tempfile("hihi.txt"), "12")"""
-function tempfile(fn)
-  date = @> string(now())[1:13] replace(":", "-")
-  name, ext = splitfile(fn)
-  joinpath(tempdir(), date * "_" * name * "." *ext)
-end
+export timename
+timename(fn) = joinpath(tempdir(), minute() * "_" * fn)
 
 export @catch
 macro catch(ex)
@@ -554,10 +556,10 @@ export imconvert
 function imconvert(ext1, ext2)
   for (root, dirs, files) in walkdir(pwd())
     for file in files
-      name, ext = splitfile(joinpath(root, file))
+      name, ext = splitext(joinpath(root, file))
       if ext == ext1
-        name1 = name * "." * ext1
-        name2 = name * "." * ext2
+        name1 = name * ext1
+        name2 = name * ext2
         run(`imconvert $name1 $name2`)
       end
     end
@@ -1000,12 +1002,6 @@ end
 #   filename
 # end
 
-function test()
-	open(joinpath(homedir(),"test.txt"), "a") do f
-		write(f, string(now()),"\n")
-	end
-end
-
 macro success(ex)
 	quote
 		fail = true
@@ -1032,10 +1028,10 @@ function rsync(src, dst, port = 22; delete = true)
 end
 
 macro plots()
-	ex = :(import Plots; Plots.gr())
+	ex = :(import Plots)
 	if isdefined(:IJulia)
 		ex = Expr(:block, ex,
-		:(Plots.default(size=(600,300),html_output_format="png")))
+		:(Plots.default(size = (600, 300), html_output_format = "png")))
 	end
 	esc(ex)
 end
@@ -1056,18 +1052,6 @@ function require()
 	end
 end
 
-function build()
-	pkgs = ["WinRPM"]
-	for pkg in pkgs
-		Pkg.build(pkg)
-	end
-
-	pkgs = ["GR", "Plots", "Gtk", "PyCall", "IJulia", "BenchmarkTools"]
-	for pkg in pkgs
-		Pkg.build(pkg)
-	end
-end
-
 export ps
 export @ps_str
 function ps(str)
@@ -1078,11 +1062,7 @@ end
 macro ps_str(str)
 	ps(str)
 end
-# macro ps_str(str)
-#   str = replace(str,"\\\$", "\$")
-#   str = replace(str, "\n", ";")
-#   "run(`powershell $str`)" |> parse
-# end
+
 export @bat_str
 macro bat_str(str)
   file = tempname()*".bat"
@@ -1156,8 +1136,8 @@ function Bernoulli(m::Integer)
 end
 
 function generate(pkgname)
-  pkgname="Documenter"
-  path = Pkg.dir(pkgname,"docs","make.jl")
+  pkgname = "Documenter"
+  path = Pkg.dir(pkgname, "docs", "make.jl")
   run(`vim $path`)
   include(path)
 end
@@ -1170,7 +1150,7 @@ function piecewise(x::Symbol,c::Expr,f::Expr)
   @assert f.head==:vect
   vf=Vector{Function}(n)
   for i in 1:n
-    vf[i]=@eval $x->$(f.args[i])
+    vf[i] = @eval $x->$(f.args[i])
   end
   return @eval ($x)->($(vf)[findfirst($c)])($x)
 end
@@ -1193,7 +1173,7 @@ function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
   for col in 1:length(colptr)-1
     xc = x[col]
     @inbounds for s = colptr[col] : (colptr[col+1]-1)
-        y[I[s]] += A[s]*xc
+        y[I[s]] += A[s] * xc
     end
   end
 end
@@ -1207,47 +1187,6 @@ function exreplace!(ex::Expr, r, s)
   end
   ex
 end
-
-# export @replace
-# macro replace(ex)
-#     ex = macroexpand(ex)
-#     typs = []
-#     names = [] # fieldnames
-#     for sym in ex.args[1].args[2:end]
-#         if isa(sym, Expr)
-#             push!(names, sym.args[1])
-#             push!(typs, sym.args[2])
-#         end
-#     end
-#
-#     for (typ,n) in zip(typs, names)
-#         for f in fieldnames(eval(current_module(),typ))
-#             exreplace!(ex.args[2], :($f), :($n.$f))
-#         end
-#     end
-#     # @show ex
-#     esc(ex)
-# end
-# macro replace(ex)
-#     typs = []
-#     names = [] # fieldnames
-#     for sym in ex.args[1].args[2:end]
-#         if isa(sym, Expr)
-#             push!(names, sym.args[1])
-#             push!(typs, sym.args[2])
-#         end
-#     end
-#
-#     str = string(ex.args[2])
-#     for (typ,n) in zip(typs, names)
-#         for f in fieldnames(eval(current_module(),typ))
-#             str = replace(str,Regex("(?<=\\W)$f\\b"),"$n.$f")
-#         end
-#     end
-#     ex.args[2] = parse(str)
-#     @show ex
-#     esc(ex)
-# end
 
 export Float
 typealias Float Float64
