@@ -17,8 +17,35 @@ using StatsBase
 
 @reexport using Logging
 
-using PyCall
+@reexport using PyCall
 
+@reexport using Polynomials
+# function confusmat(y, ypred)
+#   R[i, j] == countnz((gt .== i) & (pred .== j))
+# end
+
+export rename_youtube
+function rename_youtube()
+  for (root, dirs, files) in walkdir(pwd())
+    for file in files
+      fn = joinpath(root, file)
+      fn_new = @>(fn, replace(r" \(.*\)", ""),
+                  replace("%3", " "), replace("_hd", ""))
+      try mv(fn, fn_new) end
+    end
+  end
+end
+
+export undersample
+function undersample(xs::Array...; nsample = 2, featuredim = "col")
+	if featuredim == "col"
+		getfun, setfun, countfun = cget, cset!, ccount
+	elseif featuredim == "row"
+		getfun, setfun, countfun = rget, rset!, rcount
+	end
+  cols = rand(1:countfun(xs[1]), nsample)
+  [getfun(x, cols) for x in xs]
+end
 
 export plus, minus
 plus(x::Real) = ifelse(x > 0, one(x), zero(x))
@@ -68,9 +95,14 @@ function linux_restore(file)
   run(`tar xf $(abspath(file)) -C /`)
 end
 
-function Base.shuffle(x::Array, y::Array)
+function Base.shuffle(x::AbstractArray, y::AbstractArray; featuredim = "col")
+	if featuredim == "col"
+		getfun, setfun, countfun = cget, cset!, ccount
+	elseif featuredim == "row"
+		getfun, setfun, countfun = rget, rset!, rcount
+	end
   a = randperm(length(y))
-  x, y = cget(x, a), cget(y, a)
+  x, y = getfun(x, a), getfun(y, a)
 end
 
 export typeparam
@@ -151,6 +183,34 @@ function Base.vcat(X::Tuple...)
   end
 end
 
+###############################################################################
+# end of cget
+###############################################################################
+export csize, clength, ccount, cview, cget, cset!, size2
+csize(a) = (ndims(a) == 1 ? size(a) : size(a)[1:end-1])
+csize(a, n) = tuple(csize(a)..., n) # size if you had n columns
+clength(a) = (ndims(a) == 1 ? 1 : stride(a, ndims(a)))
+ccount(a) = (ndims(a) == 1 ? length(a) : size(a, ndims(a)))
+cview(a, i) = (ndims(a) == 1 ? (@view a[i]) : view(a, ntuple(i->(:), ndims(a) - 1)..., i))
+cget(a, i) = (ndims(a) == 1 ? a[i] : getindex(a, ntuple(i->(:), ndims(a)-1)..., i))
+cset!(a, x, i) = (ndims(a) == 1 ? (a[i] = x) : setindex!(a, x, ntuple(i->(:), ndims(a) - 1)..., i))
+size2(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (stride(y, nd), size(y, nd)))) # size as a matrix
+size2(y, i) = size2(y)[i]
+
+export rsize, rlength, rrount, rview, rget, rset!, size1
+rsize(a) = (ndims(a)==1 ? size(a) : size(a)[2:end])
+rsize(a, n) = tuple(n, rsize(a)...) # size if you had n columns
+rlength(a) = (ndims(a) == 1 ? length(a) : stride(a, ndims(a)))
+rcount(a) = (ndims(a) == 1 ? length(a) : size(a, 1))
+rview(a, i) = (ndims(a) == 1 ? (@view a[i]) : view(a, i, ntuple(i->(:), ndims(a) - 1)...))
+rget(a, i) = (ndims(a) == 1 ? a[i] : getindex(a, i, ntuple(i->(:), ndims(a)-1)...))
+rset!(a, x, i) = (ndims(a)==1 ? (a[i] = x) : setindex!(a, x, i, ntuple(i->(:), ndims(a)-1)...))
+size1(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (size(y, 1), prod(size(y)[2:end])))) # size as a matrix
+size1(y, i) = size1(y)[i]
+###############################################################################
+# end of cget
+###############################################################################
+
 # function smotetomek(x, y)
 #   SMOTETomek = pyimport("imblearn.combine")[:SMOTETomek]()
 #   for t in 1:length(unique(y)) - 1
@@ -207,41 +267,33 @@ export balance
     hist1(y, -1.5:1.5)
     hist1(yb, -1.5:1.5)
 """
-function balance(x, y)
-  xsize = size(x); ysize = size(y)
-  xsize[1] > xsize[2] && (x = x')
+function balance(x, y; featuredim = "col")
+	if featuredim == "col"
+		getfun, setfun, countfun = cget, cset!, ccount
+	elseif featuredim == "row"
+		getfun, setfun, countfun = rget, rset!, rcount
+	end
+
   d = Dict()
   for i in eachindex(y)
-    get!(d, y[i], [x[:, i]])
-    push!(d[y[i]], x[:, i])
+    get!(d, getfun(y, i), [getfun(x, i)])
+    push!(d[getfun(y, i)], getfun(x, i))
   end
 
   xb, yb = similar(x), similar(y)
   ny, key, vals = length(d), collect(keys(d)), collect(values(d))
 
   for i in 1:length(y)
-    _ = rand(1:ny)
-    yb[i] = key[_]
-    xb[:, i] = rand(vals[_])
+    r = rand(1:ny)
+    setfun(yb, key[r], i)
+    setfun(xb, rand(vals[r]), i)
   end
-  return reshape(xb, xsize), reshape(yb, ysize)
+	xb, yb
 end
 
 
 export readabsdir
 readabsdir(dir) = map(file->joinpath(dir, file), readdir(dir))
-
-export csize, clength, ccount, cview, cget, cset!, size2, size2
-csize(a)=(ndims(a)==1 ? size(a) : size(a)[1:end-1])
-csize(a,n)=tuple(csize(a)..., n) # size if you had n columns
-clength(a)=(ndims(a)==1 ? length(a) : stride(a,ndims(a)))
-ccount(a)=(ndims(a)==1 ? 1 : size(a,ndims(a)))
-cview(a,i)=(ndims(a)==1 ? (@view a[i]) : view(a, ntuple(i->(:), ndims(a)-1)..., i))
-cget(a,i)=(ndims(a)==1 ? a[i] : getindex(a, ntuple(i->(:), ndims(a)-1)..., i))
-cset!(a,x,i)=(ndims(a)==1 ? (a[i] = x) : setindex!(a, x, ntuple(i->(:), ndims(a)-1)..., i))
-size2(y)=(nd=ndims(y); (nd==1 ? (length(y),1) : (stride(y, nd), size(y, nd)))) # size as a matrix
-size2(y,i)=size2(y)[i]
-
 
 export hasnan
 function hasnan(x)
@@ -356,10 +408,12 @@ end
 ###############################################################################
 # end of BoundEncoder
 ###############################################################################
-
-
-export hist1
-hist1(o...) = StatsBase.fit(Histogram, o...).weights
+export histn
+"c, w = hist(rand(10), rand(10), rand(10))"
+function histn(xs::Array...; o...)
+	h = StatsBase.fit(StatsBase.Histogram, vec.(xs); o...)
+	edge2center.(h.edges), h.weights
+end
 
 export @DataFrame
 macro DataFrame(exs...)
@@ -545,7 +599,7 @@ function labelplot(x, label)
   t0 = 1
   for t in 2:length(x)
     if label[t] != label[t-1] || t == length(x)
-      Main.plot!(p, t0:t, x[t0:t]; color=label[t-1], label=label[t-1])
+      Main.plot!(p, t0:t, x[t0:t]; color = Int(label[t-1]), label = label[t-1])
       t0 = t
     end
   end
@@ -566,8 +620,9 @@ function imconvert(ext1, ext2)
   end
 end
 
-export fieldvalues
+export fieldvalues, fields
 fieldvalues(x) = [getfield(x, s) for s in fieldnames(x)]
+fields(x) = [(s, getfield(x, s)) for s in fieldnames(x)]
 
 ###############################################################################
 # LabelEncoder
@@ -576,6 +631,8 @@ export LabelEncoder, fit_transform, fit, transform, inverse_transform
 @with_kw type LabelEncoder
   unique_label::Array = []
 end
+
+Base.length(encoder::LabelEncoder) = length(encoder.unique_label)
 
 function fit_transform(encoder::LabelEncoder, label)
   fit(encoder, label)
@@ -588,11 +645,11 @@ function fit(encoder::LabelEncoder, label)
 end
 
 function transform(encoder::LabelEncoder, label)
-  [findfirst(encoder.unique_label, l) for l in label]
+  [findfirst(encoder.unique_label, l) - 1 for l in label]
 end
 
 function inverse_transform(encoder::LabelEncoder, index)
-  [encoder.unique_label[i] for i in index]
+  [encoder.unique_label[Int(i + 1)] for i in index]
 end
 ###############################################################################
 # end of LabelEncoder
@@ -748,45 +805,43 @@ Base.min(itr) = minimum(itr)
 export xcov
 xcov(A,B) = xcorr(A .- mean(A), B .- mean(B))
 
+export entropy
 "entropy(randn(10000))"
 function entropy(x)
-	edge, counts = histogram(x)
-	P = counts / sum(counts)
-	H = sum(-P .* log(2, P))
-	scale = log(2, length(edge) - 1)
+	ε = 1e-100
+	c, w = histn(x)
+	P = w / sum(w)
+	H = sum(-P .* log.(2, P .+ ε))
+	scale = log(2, prod(length.(c)))
 	return H / scale
 end
 
-
-"mutual_info(randn(10000), randn(10000))"
-function mutual_info(x, y)
+export mutualinfo
+"mutualinfo(randn(10000), randn(10000))"
+function mutualinfo(x, y)
 	ε = 1e-100
-	edge1, edge2, counts = histogram2D(x, y)
-	Pxy = counts / sum(counts)
-	Px = sum(Pxy, 1)
-	Py = sum(Pxy, 2)
-	Hx = sum(-Px.*log(2, Px))
-	Hy = sum(-Py.*log(2, Py))
-	I = sum(Pxy .* log(2, (Pxy + ε) ./ (Py * Px + ε)))
-	scale = log(2, (length(edge1) - 1) * (length(edge2) - 1))
-	return Hx / scale, Hy / scale, I / scale
+	c, w = histn(x, y)
+	Pxy = w / sum(w)
+	Px = sum(Pxy, 2)
+	Py = sum(Pxy, 1)
+	Hx = sum(-Px .* log.(2, Px .+ ε))
+	Hy = sum(-Py .* log.(2, Py .+ ε))
+	I = sum(Pxy .* log.(2, Pxy ./ (Px .* Py .+ ε) .+ ε))
+	return I / Hy
 end
 
-"kl_diverge(randn(100000), randn(100000) + 10)"
-function kl_diverge(x1,x2)
+export kl
+"kl(randn(100000), randn(100000) + 10)"
+function kl(x1, x2)
 	ε = 1e-100
-  low = minimum([x1; x2])
-	up = maximum([x1; x2])
-	N = 1000
-	edge = linspace(low,up,N+1)
-	~, counts1 = hist(x1, edge)
-	~, counts2 = hist(x2, edge)
-	P1 = counts1 / sum(counts1)
-	P2 = counts2 / sum(counts2)
-	center = edge2center(edge)
-	D_kl_diverge = sum(P1 .* log(2, P1 ./ (P2 + ε) + ε))
+	low, up = extrema((extrema(x1)..., extrema(x2)...))
+	edge = linspace(low, up, 1000)
+	P1 = @as _ x1 fit(Histogram, vec(_), edge) _ ./ sum(_)
+	P2 = @as _ x2 fit(Histogram, vec(_), edge) _ ./ sum(_)
+	KL = sum(P1 .* log.(2, P1 ./ (P2 .+ ε) .+ ε))
 end
 
+export edge2center
 "edge2center(0:0.1:1)"
 function edge2center(edge)
 	dx = edge[2] - edge[1]
@@ -862,9 +917,13 @@ function ica(X::Array{Float64,2}, M::Int64)
   return W * Q
 end
 
+export cutoff
 heaviside(x) = 0.5 * (1 + sign(x))
 delta(x, δx = 1e-3) = (heaviside(x + δx / 2) - heaviside(x - δx / 2)) / δx
 interval(x, xmin, xmax) = x > xmax ? 0.0 : (x < xmin ? 0.0 : 1.0)
+cutoff{T}(x::T, xmin, xmax)::T =   x < xmin ? xmin :
+                                   x > xmax ? xmax : x
+
 
 export minimums
 function minimums(x)
@@ -1371,13 +1430,16 @@ end
 
 
 export splitdata
-function splitdata(x, y)
-    n1, n2 = size(x)
-    xtrn = x[:, 1:4*n2÷5]
-    xtst = x[:, 4*n2÷5+1:n2]
-    ytrn = y[:, 1:4*n2÷5]
-    ytst = y[:, 4*n2÷5+1:n2]
-    return  xtrn, ytrn, xtst, ytst
+function splitdata(x, y; featuredim = "col")
+	if featuredim == "col"
+		getfun, setfun, countfun = cget, cset!, ccount
+	elseif featuredim == "row"
+		getfun, setfun, countfun = rget, rset!, rcount
+	end
+  n = countfun(x)
+  xtrn, xtst = getfun(x, 1:4*n÷5), getfun(x, 4*n÷5+1:n)
+  ytrn, ytst = getfun(y, 1:4*n÷5), getfun(y, 4*n÷5+1:n)
+  return  xtrn, ytrn, xtst, ytst
 end
 
 export indmax
@@ -1389,6 +1451,7 @@ end
 "indmax(x,dim)"
 function Base.indmax(x, dim::Int) # mimic maximum(x,dim)
   findmax(x, dim)[2]
+  ind2sub(size(x), vec(findmax(x, dim)[2]))[dim]
 end
 
 export @cat

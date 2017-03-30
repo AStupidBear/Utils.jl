@@ -18,6 +18,9 @@ function git(path = pwd(), suffix = ".jl")
 	run(`git remote remove $folder`)
 end
 
+using Plots
+using StatPlots
+using PlotRecipes
 # @step gcd(1,2)
 #
 # using Utils
