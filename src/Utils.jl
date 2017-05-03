@@ -1,30 +1,308 @@
 module Utils
 __precompile__()
 
-using DataFrames
-export DataFrame, by, dropna, rename
-
 using Reexport
 export @reexport
+
+using DataFrames
+export DataFrame, aggregate, by, combine, describe, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna
 
 using Lazy: @as, @>, @>>
 export @as, @>, @>>
 
-using Parameters: @with_kw
-export @with_kw
-
 using StatsBase
 
-@reexport using Logging
+using Glob
+export glob
 
 @reexport using PyCall
 
 @reexport using Polynomials
+
+@reexport using Parameters
+
+# @reexport using Logging
+
 # function confusmat(y, ypred)
 #   R[i, j] == countnz((gt .== i) & (pred .== j))
 # end
 
-export rename_youtube
+
+###############################################################################
+# type try
+###############################################################################
+export @ignore
+macro ignore(ex)
+  :(try $ex; catch e; warn(e); end) |> esc
+end
+
+export @catch
+macro catch(ex)
+  :(try $ex; catch e; warn(e); return; end) |> esc
+end
+
+export @correct
+macro correct(ex)
+  :(res = try $ex end; res == nothing ? false : res)
+end
+
+export ntry
+macro ntry(ex, n = 1000)
+	:(for t in 1:$n
+  		try $ex; break; catch e; warn(e);	end
+  	end) |> esc
+end
+
+export @trys
+macro trys(exs...)
+  expr = :()
+  for ex in exs[end:-1:1]
+    expr = :(try $ex; catch e; $expr; end)
+  end
+  esc(expr)
+end
+###############################################################################
+# type try
+###############################################################################
+
+###############################################################################
+# type traits
+###############################################################################
+export @trait, @mixin
+
+traits_declarations = Dict{Symbol, Array{Expr}}()
+
+macro trait(typedef)
+  typedef = macroexpand(typedef)
+  declare, block = typedef.args[2:3]
+  sym = (@correct declare.head == :<:) ? declare.args[1] : declare
+  traits_declarations[sym] = block.args
+  Expr(:abstract, declare) |> esc
+end
+
+macro mixin(typedef)
+  typedef = macroexpand(typedef)
+  head = typedef.head
+  sym, parent = typedef.args[2].args
+  block = typedef.args[3]
+  prepend!(block.args, get(traits_declarations, parent, Expr[]))
+  Expr(head, true, Expr(:<:, sym, parent), block) |> esc
+end
+
+
+###############################################################################
+# end of type traits
+###############################################################################
+
+export capitalize
+capitalize = uppercase
+
+Base.find(s::String, c::Union{Char, Vector{Char}, String, Regex}, start = 1) = search(s, c, start)
+
+function Base.delete!(x::Array, key)
+  inds = findfirst(x, key)
+  for i in inds
+    deleteat!(x, i)
+  end
+  x
+end
+
+export hasfield
+hasfield(x, s) = isdefined(x, s)
+
+function paper(fn)
+	download("https://raw.githubusercontent.com/ihrke/markdown-paper/master/templates/elsarticle-template-1-num.latex", "elsarticle-template-1-num.latex")
+	run(`pandoc $fn.md
+			-s -S -o $fn.pdf
+			--filter=pandoc-crossref
+			--filter=pandoc-citeproc
+			--template=elsarticle-template-1-num.latex
+			--bibliography=references.bib`)
+	rm("elsarticle-template-1-num.latex")
+end
+
+
+const STYLEPATH = "https://raw.githubusercontent.com/tompollard/phd_thesis_markdown/master/style"
+
+function thesis(fn, fmt = "pdf"; title = "This is the title of the thesis", name = "Yao Lu")
+  if fmt == "pdf"
+    download("$STYLEPATH/template.tex", "template.tex")
+    download("$STYLEPATH/preamble.tex", "preamble.tex")
+    run(`pandoc $(glob("*.md"))
+        -o $fn.pdf
+        --filter=pandoc-crossref
+        --filter=pandoc-citeproc
+        --include-in-header=preamble.tex
+        --template=template.tex
+        --bibliography=references.bib
+        --csl=$STYLEPATH/ref_format.csl
+        --highlight-style=pygments
+        --variable=fontsize:12pt
+        --variable=papersize:a4paper
+        --variable=documentclass:report
+        --number-sections
+        --latex-engine=xelatex`)
+    rm("template.tex")
+    rm("preamble.tex")
+  elseif fmt == "html"
+    download("$STYLEPATH/template.html", "template.html")
+    download("$STYLEPATH/style.css", "style.css")
+    @>(readstring("template.html"),
+    replace("This is the title of the thesis", title),
+    replace("Firstname Surname", name)) |>
+    x -> write("template.html", x)
+    run(`pandoc $(glob("*.md"))
+        -o $fn.html
+        --filter=pandoc-crossref
+        --filter=pandoc-citeproc
+        --standalone
+        --bibliography=references.bib
+        --csl=$STYLEPATH/ref_format.csl
+        --include-in-header=style.css
+        --template=template.html
+        --toc`)
+    rm("template.html")
+    rm("style.css")
+  end
+end
+
+
+"""
+    file = "A unified approach to building and controlling spiking attractor networks"
+    name2bib(file)
+    clipboard(join([file, "12"],"\n"))
+    name2bib()
+"""
+function name2bib(file::AbstractString; issn="", volume="", issue="", pages="")
+  try
+    filep = replace(file, " ", "+")
+    url = "http://libgen.io/scimag/index.php?s=$filep&journalid=$issn&&v=$volume&i=$issue&p=$pages&redirect=1"
+    content = url |> download |> readstring
+
+    pat = r"<a href=\"(.*)\"  title=.*>Libgen"
+    url = match(pat, content).captures[1] |> string
+    content = url |> download |> readstring
+
+    pat = r"<textarea.*>(.*)</textarea>"s
+    bib = match(pat, content).captures[1] |> string
+  catch
+    file
+  end
+end
+
+function name2bib()
+  files = strip.(split(clipboard(),"\n"))
+  filter!(x->!isempty(x), files)
+
+  fails = []; succs = []
+  for file in files
+    bib = bibtex(file)
+    if bib != file
+      push!(succs, bib)
+    else
+      push!(fails, file)
+    end
+  end
+
+  bibs = join([succs; fails],"\n")
+  println(bibs)
+  clipboard(bibs)
+  bibs
+end
+
+
+"""
+    file = "A unified approach to building and controlling spiking attractor networks"
+    libgen(file)
+    clipboard(join([file,"12"],"\n"))
+    libgen()
+"""
+function libgen(file::AbstractString; issn="", volume="", issue="", pages="")
+  try
+    filep = replace(file, " ", "+")
+    url = "http://libgen.io/scimag/index.php?s=$filep&journalid=$issn&&v=$volume&i=$issue&p=$pages&redirect=1"
+    content = url |> download |> readstring
+
+    pat = r"<a href=\"(.*)\"  title=.*>Libgen"
+    url = match(pat, content).captures[1] |> string
+    content = url |> download |> readstring
+
+    pat = r"<a href='(.*)'><h2>DOWNLOAD</h2>"
+    url = match(pat, content).captures[1] |> string
+  catch
+    file
+  end
+end
+
+function libgen()
+  files = strip.(split(clipboard(), "\n"))
+  filter!(x->!isempty(x), files)
+
+  fails = []; succs = []
+  for file in files
+    url = libgen(file)
+    if url != file
+      push!(succs, url)
+    else
+      push!(fails, file)
+    end
+  end
+
+  urls = join([succs; fails],"\n")
+  println(urls)
+  clipboard(urls)
+  urls
+end
+
+"""
+doi2cit("10.1126/science.169.3946.635")
+"""
+doi2cit(doi) = readstring(`curl -LH "Accept: text/x-bibliography; style=apa" https://doi.org/$doi -k`)
+"""
+doi2bib("10.1126/science.169.3946.635")
+"""
+doi2bib(doi) = readstring(`curl -LH "Accept: application/x-bibtex" https://doi.org/$doi -k`)
+
+"""
+markdown-preview-enhanced
+
+# Examples
+
+```{julia output:"html", id:"hehe"}
+using Plots; plot(rand(10)) |> mpe
+```
+"""
+function mpe(p, fmt::Symbol = :svg)
+    p.attr[:html_output_format] = fmt
+    show(STDOUT, MIME("text/html"), p)
+end
+
+export parseweb
+function parseweb(url; relative = false, parent = false)
+  opts = `--continue --recursive --convert-links --html-extension
+              --page-requisites --no-check-certificate`
+  relative == true && (opts = `$opts --relative`)
+  parent == false && (opts = `$opts --no-parent`)
+  run(`wget $opts $url`)
+end
+
+export viewdf
+function viewdf(df)
+  fn = tempname() * ".csv"
+  writetable(fn, df)
+  is_windows() && spawn(`csvfileview $fn`)
+end
+
+export viewmat
+function viewmat(x)
+  fn = tempname() * ".csv"
+  writecsv(fn, vcat(colvec(1:size(x, 2)), x))
+  is_windows() && spawn(`csvfileview $fn`)
+end
+
+export sign
+Base.sign(x::Real, Θ) = ifelse(x < -Θ, oftype(x, -1), ifelse(x > Θ, one(x), zero(x)))
+
 function rename_youtube()
   for (root, dirs, files) in walkdir(pwd())
     for file in files
@@ -67,7 +345,6 @@ function git(path = pwd(), suffix = "")
 	run(`git add .`)
 	try run(`git commit -m $(now())`) end
 	run(`git push $folder master`)
-	run(`git remote remove $folder`)
 end
 
 export typename
@@ -76,7 +353,6 @@ function typename{T}(x::T)
   isempty(ext) ? name : ext[2:end]
 end
 
-export proxy
 function proxy(url)
   regKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
   run(`powershell Set-ItemProperty -path \"$regKey\" AutoConfigURL -Value $url`)
@@ -101,7 +377,7 @@ function Base.shuffle(x::AbstractArray, y::AbstractArray; featuredim = "col")
 	elseif featuredim == "row"
 		getfun, setfun, countfun = rget, rset!, rcount
 	end
-  a = randperm(length(y))
+  a = randperm(countfun(x))
   x, y = getfun(x, a), getfun(y, a)
 end
 
@@ -111,7 +387,6 @@ typeparam{T}(x::T) = T.parameters[1]
 export memory
 memory(x) = Base.summarysize(x) / 1024^2
 
-export cron
 """cron("spam.jl", 1)"""
 function cron(fn, repeat)
   name = splitext(fn)[1]
@@ -129,7 +404,6 @@ function cron(fn, repeat)
   run(`task.bat`)
 end
 
-export @debug, @info
 macro debug(ex)
   x = gensym()
   :($x = $ex; debug($x); $x) |> esc
@@ -173,16 +447,24 @@ macro undict(d, exs...)
   esc(blk)
 end
 
-"""
-	X = [([1,2,3],[4,5,6]), ([1,2,3], [4,5,6])]
-	vcat(X) == vcat(X...)
-"""
-function Base.vcat(X::Tuple...)
-  ntuple(length(X[1])) do j
-    mapreduce(i -> X[i][j], vcat, 1:length(X))
+# """
+# 	X = [([1,2,3],[4,5,6]), ([1,2,3], [4,5,6])]
+# 	vcat(X) == vcat(X...)
+# """
+for f in (:vcat, :hcat)
+  @eval begin
+    function Base.$f(X::Tuple...)
+      ntuple(length(X[1])) do j
+        mapreduce(i -> X[i][j], $f, 1:length(X))
+      end
+    end
   end
 end
-
+# function Base.vcat(X::Tuple...)
+#   ntuple(length(X[1])) do j
+#     mapreduce(i -> X[i][j], vcat, 1:length(X))
+#   end
+# end
 ###############################################################################
 # end of cget
 ###############################################################################
@@ -197,7 +479,7 @@ cset!(a, x, i) = (ndims(a) == 1 ? (a[i] = x) : setindex!(a, x, ntuple(i->(:), nd
 size2(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (stride(y, nd), size(y, nd)))) # size as a matrix
 size2(y, i) = size2(y)[i]
 
-export rsize, rlength, rrount, rview, rget, rset!, size1
+export rsize, rlength, rcount, rview, rget, rset!, size1
 rsize(a) = (ndims(a)==1 ? size(a) : size(a)[2:end])
 rsize(a, n) = tuple(n, rsize(a)...) # size if you had n columns
 rlength(a) = (ndims(a) == 1 ? length(a) : stride(a, ndims(a)))
@@ -210,53 +492,6 @@ size1(y, i) = size1(y)[i]
 ###############################################################################
 # end of cget
 ###############################################################################
-
-# function smotetomek(x, y)
-#   SMOTETomek = pyimport("imblearn.combine")[:SMOTETomek]()
-#   for t in 1:length(unique(y)) - 1
-#     x, y = SMOTETomek[:fit_sample](x, y)
-#   end
-#   return x, y
-# end
-#
-# function smote(x, y)
-#   SMOTE = pyimport("imblearn.over_sampling")[:SMOTE]()
-#   for t in 1:length(unique(y)) - 1
-#     x, y = SMOTE[:fit_sample](x, y)
-#   end
-#   return x, y
-# end
-#
-# function nearmiss(x, y)
-#   NearMiss = pyimport("imblearn.under_sampling")[:NearMiss](
-#     version = 2, random_state = 42)
-#   NearMiss[:fit_sample](x, y)
-# end
-#
-# function tomeklinks(x, y)
-#   TomekLinks = pyimport("imblearn.under_sampling")[:TomekLinks]()
-#   for t in 1:length(unique(y)) - 1
-#     x, y = TomekLinks[:fit_sample](x, y)
-#   end
-#   return x, y
-# end
-#
-# export balance
-# """
-#     x = rand(200, 3); y = rand(1:3, 200)
-#     xb, yb = balance(x, y)
-#
-#     x = rand(3, 200); y = rand(1:3, 200)
-#     xb, yb = balance(x, y)
-# """
-# function balance(x, y, method = smotetomek)
-#   if size(x, 2) > size(x, 1)
-#     xb, yb = method(x', vec(y))
-#     return xb', yb
-#   else
-#     return method(x, vec(y))
-#   end
-# end
 
 export balance
 """
@@ -334,17 +569,6 @@ minute() = @> string(now())[1:16] replace(":", "-")
 export timename
 timename(fn) = joinpath(tempdir(), minute() * "_" * fn)
 
-export @catch
-macro catch(ex)
-  quote
-    try
-      $ex
-    catch e
-      Logging.err(e)
-    end
-  end |> esc
-end
-
 ###############################################################################
 # BoundEncoder
 ###############################################################################
@@ -409,7 +633,7 @@ end
 # end of BoundEncoder
 ###############################################################################
 export histn
-"c, w = hist(rand(10), rand(10), rand(10))"
+"c, w = histn(rand(10), rand(10), rand(10))"
 function histn(xs::Array...; o...)
 	h = StatsBase.fit(StatsBase.Histogram, vec.(xs); o...)
 	edge2center.(h.edges), h.weights
@@ -452,6 +676,12 @@ macro rep(n, ex)
   name = ex.args[1].args[1] |> string
   exs = [exreplace(ex, Symbol(name), Symbol(name*"$i")) for i in 1:n]
   @as _ exs Expr(:block, _...) esc
+end
+
+export @withkw
+macro withkw(ex)
+  ex = macroexpand(ex)
+  :(Parameters.@with_kw $ex) |> esc
 end
 
 export @param
@@ -549,7 +779,6 @@ function transfer_system(ip, user, port)
   # run(cmd)
 end
 
-export ustc, highchain
 ustc() = transfer_system("172.16.1.17", "luyao", 22)
 highchain() = transfer_system("101.231.45.146", "luyao", 8822)
 
@@ -557,7 +786,6 @@ export linux_path, cygdrive
 linux_path(path) = replace(path, "\\", "/")
 cygdrive(path) = @> path linux_path replace(":", "") _->"/cygdrive/$_"
 
-export junocloud
 function junocloud(ip, user, port)
   local_root = joinpath(homedir(), "Documents", "Codes") |> linux_path
   remote_root = "/home/$user/Documents"
@@ -569,15 +797,15 @@ function junocloud(ip, user, port)
   julia_eval = """using Juno;Juno.connect(1234)"""
   ssh_eval = """chmod 400 ~/.ssh/id_rsa; ~/julia-0.5/bin/julia -i -e "$julia_eval"; bash"""
 
-  src= joinpath(homedir(), ".juliarc.jl") |> cygdrive
+  src= joinpath(homedir(), ".juliarc.jl")
   dst = "$user@$ip:/home/$user/.juliarc.jl"
   rsync(src, dst, port)
 
-  src = joinpath(homedir(), ".ssh", "id_rsa") |> cygdrive
+  src = joinpath(homedir(), ".ssh", "id_rsa")
   dst = "$user@$ip:/home/$user/.ssh/id_rsa"
   rsync(src, dst, port)
 
-  src = cygdrive(local_root)
+  src = local_root
   dst = "$user@$ip:$remote_root"
   rsync(src, dst, port)
 
@@ -606,7 +834,6 @@ function labelplot(x, label)
   return p
 end
 
-export imconvert
 function imconvert(ext1, ext2)
   for (root, dirs, files) in walkdir(pwd())
     for file in files
@@ -737,6 +964,11 @@ end
 ###############################################################################
 # end of MinMaxScaler
 ###############################################################################
+
+
+###############################################################################
+# ImageScaler
+###############################################################################
 export ImageScaler, fit_transform, fit, transform, inverse_transform
 
 """
@@ -766,23 +998,13 @@ function transform(scaler::ImageScaler, x, reshape = true)
   xs = transform(scaler.scaler, x)
   reshape ? Base.reshape(xs, (scaler.imagesize..., ccount(x))) : xs
 end
-
-###############################################################################
-# ImageScaler
-###############################################################################
 ###############################################################################
 # end of ImageScaler
 ###############################################################################
 
-export softmax
-softmax(x) = (y = exp(x); y ./ sum(y, 1))
-
-export hardmax
-hardmax(x) = x .== maximum(x, 1)
-# function hardmax(x)
-#   x = x .- maximum(x, 1)
-#   1 + sign(x)
-# end
+export softmax, hardmax
+softmax(x, dim = 1) = (y = exp(x); y ./ sum(y, dim))
+hardmax(x, dim = 1) = x .== maximum(x, dim)
 
 macro curry(n, f)
     syms = [gensym() for i=1:n]
@@ -802,6 +1024,9 @@ end
 Base.max(itr) = maximum(itr)
 Base.min(itr) = minimum(itr)
 
+###############################################################################
+# Information Theory
+###############################################################################
 export xcov
 xcov(A,B) = xcorr(A .- mean(A), B .- mean(B))
 
@@ -840,7 +1065,13 @@ function kl(x1, x2)
 	P2 = @as _ x2 fit(Histogram, vec(_), edge) _ ./ sum(_)
 	KL = sum(P1 .* log.(2, P1 ./ (P2 .+ ε) .+ ε))
 end
+###############################################################################
+# end of Information Theory
+###############################################################################
 
+###############################################################################
+# Distributions
+###############################################################################
 export edge2center
 "edge2center(0:0.1:1)"
 function edge2center(edge)
@@ -864,9 +1095,15 @@ function randprob(list, prob, dims...)
   end
   x
 end
+###############################################################################
+# end of Distributions
+###############################################################################
 
 
-"using Distributions; rand(MvNormal([1.,2.,3.], [1.,1.,1.]), 1000)"
+"""
+    using Distributions
+    rand(MvNormal([1.,2.,3.], [1.,1.,1.]), 1000)
+"""
 function pca(data::Array{Float64,2}, n=1)
   N = size(data, 2)
   data = data .- mean(data, 2)
@@ -880,12 +1117,12 @@ function pca(data::Array{Float64,2}, n=1)
 end
 
 """
-	addprocs(3)
-	T = 1000000;
-	s1 = 2 * rand(T) - 1;	s2 = 2 * rand(T) - 1
-	S0 = [s1'; s2'];
-  X = S0 * [cos(π/4) sin(π/4); -sin(π/4) cos(π/4)]
-	@time A = ICA(X, 2)
+    addprocs(3)
+    T = 1000000;
+    s1 = 2 * rand(T) - 1;	s2 = 2 * rand(T) - 1
+    S0 = [s1'; s2'];
+    X = S0 * [cos(π/4) sin(π/4); -sin(π/4) cos(π/4)]
+    @time A = ICA(X, 2)
 """
 function ica(X::Array{Float64,2}, M::Int64)
   X = X.- mean(X,2)
@@ -923,8 +1160,6 @@ delta(x, δx = 1e-3) = (heaviside(x + δx / 2) - heaviside(x - δx / 2)) / δx
 interval(x, xmin, xmax) = x > xmax ? 0.0 : (x < xmin ? 0.0 : 1.0)
 cutoff{T}(x::T, xmin, xmax)::T =   x < xmin ? xmin :
                                    x > xmax ? xmax : x
-
-
 export minimums
 function minimums(x)
   mins = similar(x)
@@ -953,20 +1188,20 @@ code2cmd(str) = @> str replace("\n","") replace("\"", "\\\"")
 export run
 Base.run(s::String) = run(`$(split(s))`)
 
-export forward_diffn
-function forward_diffn(x, n)
+export forwdiffn
+function forwdiffn(n, x, y = x)
   dx = zeros(x)
   for t in 1:(length(x) - n)
-    dx[t] = x[t + n] - x[t]
+    dx[t] = x[t + n] - y[t]
   end
   dx
 end
 
 export diffn
-function diffn(x, n)
+function diffn(n, x, y = x)
   dx = zeros(x)
-  for t in n+1:length(x)
-    dx[t] = x[t] - x[t-n]
+  for t in (n + 1):length(x)
+    dx[t] = x[t] - y[t-n]
   end
   dx
 end
@@ -1049,48 +1284,61 @@ function branin(v)
     res = 1/51.95 * ((y - 5.1*x^2 / (4*π^2) + 5x/π - 6)^2 + (10 -10/8π)cos(x) -44.81)
 end
 
-function quadratic_form(x, A, y)
-  dot(x, A*y)
+"""
+    aria2c("https://www.youtube.com")
+    aria2c("https://www.youtube.com"; proxy = "127.0.0.1:1080")
+"""
+function aria2c(url, fn; proxy = "")
+  dir, base  = splitdir(fn)
+  run(`aria2c --max-connection-per-server=8 --all-proxy=$proxy -d $dir -o $base $url`)
+  fn
 end
+aria2c(url; o...) = aria2c(url, tempname(); o...)
 
-# export download
-# function Base.download(url::AbstractString, filename::AbstractString)
-#   dir, base  = splitdir(filename)
-#   # run(`aria2c  --max-connection-per-server=8 $url -d $dir -o $base`)
-#   run(`aria2c  --max-connection-per-server=8 --http-proxy="http://127.0.0.1:1080" $url -d $dir -o $base`)
-#   filename
-# end
-
-macro success(ex)
-	quote
-		fail = true
-		while fail
-			try
-				$(esc(ex))
-				fail = false
-			catch e
-				println(e)
-			end
-		end
-	end
+export psdownload
+function psdownload(url, to)
+	run(`powershell (new-object system.net.webClient).downloadFile(\"$url\", \"$to\")`)
+	return to
 end
+psdownload(url) = psdownload(url, tempname())
 
 export rsync
-function rsync(src, dst, port = 22; delete = true)
-  if delete == true
-    run(`rsync -avzPh --delete-after -e "ssh -p $port" $src $dst`)
-  else
-    run(`rsync -avzPh -e "ssh -p $port" $src $dst`)
-  end
-  # run(`rsync -avuzPh --cvs-exclude --delete-after -e "ssh -p $port" $src $dst`)
-  # all verpose update zip progress humanreadable
+function rsync(src::String, dst::String, port = 22; zip = true, delete = true, exclude = false, update = false)
+	src = is_windows() && cygdrive(src)
+  opts = `-avPh`
+  zip && (opts = `$opts -z`)
+  delete && (opts = `$opts --delete-after`)
+  update && (opts = `$opts -u`)
+  exclude && (opts = `$opts --cvs-exclude`)
+  @ignore run(`rsync $opts -e "ssh -p $port" $src $dst`)
+  # a-all v-verpose u-update z-zip P-progress h-humanreadable
 end
+
+function rsync(srcs::Array{String}, dsts::Array{String}, port = 22; kwargs...)
+  pmap(srcs, dsts) do src, dst
+    rsync(src, dst, port; kwargs...)
+  end
+end
+
+function rsync(srcs::Array{String}, dst::String, port = 22; kwargs...)
+  pmap(srcs) do src
+    rsync(src, dst, port; kwargs...)
+  end
+end
+
+function rsync(src::String, dsts::Array{String}, port = 22; kwargs...)
+  pmap(dsts) do dst
+    rsync(src, dst, port; kwargs...)
+  end
+end
+
 
 macro plots()
 	ex = :(import Plots)
 	if isdefined(:IJulia)
 		ex = Expr(:block, ex,
-		:(Plots.default(size = (600, 300), html_output_format = "png")))
+		:(Plots.default(size = (600, 300),
+      html_output_format = "png")))
 	end
 	esc(ex)
 end
@@ -1111,30 +1359,54 @@ function require()
 	end
 end
 
-export ps
-export @ps_str
-function ps(str)
-	file = tempname()*".ps1"
-  write(file, str)
-  run(`powershell $file`)
-end
-macro ps_str(str)
-	ps(str)
+export @bat_str
+macro bat_str(str, exe = "run")
+  :(bat($str, $(symbol(exe))))
 end
 
-export @bat_str
-macro bat_str(str)
-  file = tempname()*".bat"
-  write(file, str)
-  run(`$file`)
+export bat
+function bat(str, exe = run)
+  fn = tempname() * ".bat"
+  write(fn, str)
+  exe(`$fn`)
+end
+
+export @ps_str
+# ps"""
+# $x = 1
+# echo $x
+# """
+macro ps_str(str, exe = "run")
+  :(ps($str, $(symbol(exe))))
+end
+
+export ps
+# str = """
+# \$x = 1
+# echo \$x
+# """ |> ps
+function ps(str, exe = run)
+  exe(`powershell -Command $str`)
 end
 
 export @bash_str
-macro bash_str(str)
-  str = replace(str,"\\\$", "\$")
-  file = tempname()*".bash"
-  write(file, str)
-  run(`bash $file`)
+# bash"""
+# ls
+# echo $PATH
+# python
+# """
+macro bash_str(str, exe = "run")
+  :(bash($str, $(symbol(exe))))
+end
+
+export bash
+# str = """
+# ls
+# echo \$PATH
+# python
+# """ |> bash
+function bash(str, exe = run)
+  exe(`bash -c $str`)
 end
 
 function center(edge)
@@ -1169,30 +1441,6 @@ end
 #   end
 #   y
 # end
-
-function opt_truc(f::Function, n::Integer=1)
-    s = 0 # sum of series
-    a = f(n) # a[n]
-    a_post = f(n+1) # a[n+1]
-    while abs(a_post) < abs(a)
-        s += a
-        n += 1
-        a = a_post
-        a_post = f(n+1)
-    end
-    s
-end
-
-# using FastArrays
-function Bernoulli(m::Integer)
-  B = FastArray(0:m){Float64}(:)
-  fill!(B, 0)
-  B[0] = 1
-  for n in 1:m
-    B[n] = 1 - sum(binomial(n, k) * B[k] / (n-k+1) for k in 0:n-1)
-  end
-  B[m]
-end
 
 function generate(pkgname)
   pkgname = "Documenter"
@@ -1238,11 +1486,21 @@ function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 end
 
 export exreplace!, exreplace
-exreplace(ex::Expr, r, s) = (ex = deepcopy(ex); exreplace!(ex, r, s))
-exreplace(ex, r, s) = ex == r ? s : ex
+exreplace(ex, r, s) = (ex = deepcopy(ex); exreplace!(ex, r, s))
+exreplace!(ex, r, s) = (ex == r) ? s : ex
 function exreplace!(ex::Expr, r, s)
   for i in 1:length(ex.args)
       ex.args[i] = exreplace(ex.args[i], r, s)
+  end
+  ex
+end
+
+export typreplace!, typreplace
+typreplace(ex, r, s) = (ex = deepcopy(ex); typreplace!(ex, r, s))
+typreplace!(ex, r, s) = (typeof(ex) == r) ? exreplace(s, :ex, ex) : ex
+function typreplace!(ex::Expr, r, s)
+  for i in 1:length(ex.args)
+      ex.args[i] = typreplace!(ex.args[i], r, s)
   end
   ex
 end
@@ -1443,14 +1701,13 @@ function splitdata(x, y; featuredim = "col")
 end
 
 export indmax
-"indmax(x,y,z)"
+"indmax(x, y, z)"
 function Base.indmax(xs...) # mimic max(xs...)
-  eltype(xs[1])[indmax([x...]) for x in zip(xs...)]
+  Int[indmax(collect(x)) for x in zip(xs...)]
 end
 
-"indmax(x,dim)"
-function Base.indmax(x, dim::Int) # mimic maximum(x,dim)
-  findmax(x, dim)[2]
+"indmax(x, dim)"
+function Base.indmax(x, dim::Int) # mimic maximum(x, dim)
   ind2sub(size(x), vec(findmax(x, dim)[2]))[dim]
 end
 
@@ -1664,6 +1921,31 @@ function toggle(env_name, pkgs)
 end
 
 
+function opt_truc(f::Function, n::Integer=1)
+    s = 0 # sum of series
+    a = f(n) # a[n]
+    a_post = f(n+1) # a[n+1]
+    while abs(a_post) < abs(a)
+        s += a
+        n += 1
+        a = a_post
+        a_post = f(n+1)
+    end
+    s
+end
+
+# using FastArrays
+function Bernoulli(m::Integer)
+  B = FastArray(0:m){Float64}(:)
+  fill!(B, 0)
+  B[0] = 1
+  for n in 1:m
+    B[n] = 1 - sum(binomial(n, k) * B[k] / (n-k+1) for k in 0:n-1)
+  end
+  B[m]
+end
+
+
 # using Base.Threads
 #
 # function threadcall(f::Function, run_on_thread::Int, args...; kwargs...)
@@ -1809,5 +2091,81 @@ end
 # import Base: +, -
 # +(f::Function, a::Number) = x->(f(x) + a)
 # -(f::Function) = x->-f(x)
+
+#
+# export ps
+# export @ps_str
+# function ps(str)
+# 	file = tempname()*".ps1"
+#   write(file, str)
+#   run(`powershell $file`)
+# end
+# macro ps_str(str)
+# 	ps(str)
+# end
+#
+# export @bat_str
+# macro bat_str(str)
+#   file = tempname()*".bat"
+#   write(file, str)
+#   run(`$file`)
+# end
+#
+# export @bash_str
+# macro bash_str(str)
+#   str = replace(str,"\\\$", "\$")
+#   file = tempname()*".bash"
+#   write(file, str)
+#   run(`bash $file`)
+# end
+
+
+# function smotetomek(x, y)
+#   SMOTETomek = pyimport("imblearn.combine")[:SMOTETomek]()
+#   for t in 1:length(unique(y)) - 1
+#     x, y = SMOTETomek[:fit_sample](x, y)
+#   end
+#   return x, y
+# end
+#
+# function smote(x, y)
+#   SMOTE = pyimport("imblearn.over_sampling")[:SMOTE]()
+#   for t in 1:length(unique(y)) - 1
+#     x, y = SMOTE[:fit_sample](x, y)
+#   end
+#   return x, y
+# end
+#
+# function nearmiss(x, y)
+#   NearMiss = pyimport("imblearn.under_sampling")[:NearMiss](
+#     version = 2, random_state = 42)
+#   NearMiss[:fit_sample](x, y)
+# end
+#
+# function tomeklinks(x, y)
+#   TomekLinks = pyimport("imblearn.under_sampling")[:TomekLinks]()
+#   for t in 1:length(unique(y)) - 1
+#     x, y = TomekLinks[:fit_sample](x, y)
+#   end
+#   return x, y
+# end
+#
+# export balance
+# """
+#     x = rand(200, 3); y = rand(1:3, 200)
+#     xb, yb = balance(x, y)
+#
+#     x = rand(3, 200); y = rand(1:3, 200)
+#     xb, yb = balance(x, y)
+# """
+# function balance(x, y, method = smotetomek)
+#   if size(x, 2) > size(x, 1)
+#     xb, yb = method(x', vec(y))
+#     return xb', yb
+#   else
+#     return method(x, vec(y))
+#   end
+# end
+
 
 end # End of Utils

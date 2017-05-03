@@ -4,7 +4,7 @@ import Atom, Juno, Gallium
 
 function bp(file, lines...)
   for line in lines
-    Juno.breakpoint(file, line)
+    Juno.breakpoint(abspath(file), line)
   end
 end
 
