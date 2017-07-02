@@ -1,16 +1,25 @@
 module Utils
 __precompile__()
 
+###############################################################################
+# begin of load packages
+###############################################################################
 using Reexport
 export @reexport
 
+@reexport using Suppressor
+
+@reexport using BenchmarkTools
+
+@reexport using ClobberingReload
+
+import StatsBase
+
 using DataFrames
-export DataFrame, aggregate, by, combine, describe, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna
+export DataFrame, aggregate, describe, by, combine, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna
 
 using Lazy: @as, @>, @>>
 export @as, @>, @>>
-
-using StatsBase
 
 using Glob
 export glob
@@ -21,11 +30,124 @@ export glob
 
 @reexport using Parameters
 
-# @reexport using Logging
+@reexport using MacroTools
 
-# function confusmat(y, ypred)
-#   R[i, j] == countnz((gt .== i) & (pred .== j))
+###############################################################################
+# end of load packages
+###############################################################################
+
+# function fastsrand(seed)
+#     global GSEED
+#     GSEED = seed
 # end
+
+# @inline function fastrand(GSEED)
+#     GSEED = UInt32(214013) * GSEED + UInt32(2531011)
+#     return GSEED, (GSEED >> UInt(16)) & 0x7FFF
+# end
+
+export mat2img
+function mat2img(A)
+  @eval using Images
+  colorview(RGB, permuteddimsview(A, (3, 1, 2)))
+end
+
+
+export pmapreduce
+pmapreduce(f, op, iter) = reduce(op, pmap(f, iter))
+
+function install(usrnm, pkg)
+  if !isdir(Pkg.dir(pkg))
+    Pkg.rm(pkg)
+    Pkg.clone("https://github.com/$usrnm/$pkg.jl.git")
+    Pkg.build(pkg)
+  end
+end
+
+Base.vec(x::Number) = fill(x, 1)
+Base.vec(x::Symbol) = fill(x, 1)
+Base.vec(x::Expr) = x.args
+
+export @pygen
+
+macro pygen(f)
+
+    # generate a new symbol for the channel name and
+    # wrapper function
+    c = gensym()
+    η = gensym()
+
+    # yield(λ) → put!(c, λ)
+    f′ = MacroTools.postwalk(f) do x
+        @capture(x, yield(λ_)) || return x
+        return :(put!($c, $λ))
+    end
+
+    # Fetch the function name and args
+    @capture(f′, function func_(args__) body_ end)
+
+    # wrap up the η function
+    final = quote
+        function $func($(args...))
+            function $η($c)
+                $body
+            end
+            return Channel(c -> $η(c))
+        end
+    end
+
+    return esc(final)
+end
+
+
+ENV["JULIA_EDITOR"] = "code"
+function Base.edit(path::AbstractString, line::Integer=0)
+    command = Base.editor()
+    name = basename(first(command))
+    issrc = length(path)>2 && path[end-2:end] == ".jl"
+    if issrc
+        f = Base.find_source_file(path)
+        f !== nothing && (path = f)
+    end
+    cmd = line != 0 ? `$command -g $path:$line` : `$command $path`
+    spawn(pipeline(cmd, stderr=STDERR))
+    nothing
+end
+
+Base.get(dict::Dict, key) = Base.get(dict, key, nothing)
+
+export setdefault
+"""
+    d = Dict(:a => 1)
+    get(d, :a)
+    setdefault!(d, :a, 2)
+    setdefault!(d, :b, 2)
+"""
+setdefault!(dict::Dict, key, value) = haskey(dict, key) ? dict[key] : (dict[key] = value)
+
+
+function area(coords)
+  b = coords[end]
+  v = 0.0
+  for i in 1:length(coords)
+    a, b = b, coords[i]
+    v += a[2] * b[1] - a[1] * b[2]
+  end
+  return v * 0.5
+end
+
+
+export confusmat
+function confusmat(ul, y, ypred)
+  encoder = LabelEncoder(ul)
+  ypred_int = transform(encoder, ypred) + 1
+  y_int = transform(encoder, y) + 1
+  R = Int[countnz((y_int .== i) & (ypred_int .== j)) for i in 1:len(ul), j in 1:len(ul)]
+  mat = Any["gt/pred" ul'; Any[ul R]]
+end
+
+export mat2acc
+mat2acc(mat) = sum(diag(mat)) / sum(mat)
 
 
 ###############################################################################
@@ -43,9 +165,10 @@ end
 
 export @correct
 macro correct(ex)
-  :(res = try $ex end; res == nothing ? false : res)
+  res = gensym()
+  :($res = try $ex end; $res == nothing ? false : $res) |> esc
 end
-
+``
 export ntry
 macro ntry(ex, n = 1000)
 	:(for t in 1:$n
@@ -68,11 +191,11 @@ end
 ###############################################################################
 # type traits
 ###############################################################################
-export @trait, @mixin
+export @abstrait, @trait, @mixin
 
-traits_declarations = Dict{Symbol, Array{Expr}}()
+traits_declarations = Dict{Symbol, Array}()
 
-macro trait(typedef)
+macro abstrait(typedef)
   typedef = macroexpand(typedef)
   declare, block = typedef.args[2:3]
   sym = (@correct declare.head == :<:) ? declare.args[1] : declare
@@ -80,16 +203,47 @@ macro trait(typedef)
   Expr(:abstract, declare) |> esc
 end
 
+macro trait(typedef)
+  typedef = macroexpand(typedef)
+  declare, block = typedef.args[2:3]
+  sym = (@correct declare.head == :<:) ? declare.args[1] : declare
+  traits_declarations[sym] = block.args
+  esc(typedef)
+end
+
 macro mixin(typedef)
   typedef = macroexpand(typedef)
   head = typedef.head
-  sym, parent = typedef.args[2].args
+  sym, parents = typedef.args[2].args
+  parents = vec(parents)
   block = typedef.args[3]
-  prepend!(block.args, get(traits_declarations, parent, Expr[]))
-  Expr(head, true, Expr(:<:, sym, parent), block) |> esc
+  for parent in parents
+    parentfields = get(traits_declarations, parent, Expr[])
+    append!(block.args, parentfields)
+  end
+  field = Dict()
+  for arg in block.args
+    @capture(arg, (f_::typ_=val_)|(f_::typ_)|(f_=val_))
+    f == nothing && (f = deepcopy(arg))
+    get!(field, f, deepcopy(arg))
+  end
+  block.args = collect(values(field))
+  ind = findfirst(x -> isempty(fieldnames(eval(current_module(), x))), parents)
+  if ind == 0
+    return Expr(head, true, sym, block) |> esc
+  else
+    return Expr(head, true, Expr(:<:, sym, parents[ind]), block) |> esc
+  end
 end
 
-
+# macro inherit(typedef)
+#   typedef = macroexpand(typedef)
+#   head = typedef.head
+#   sym, parent = typedef.args[2].args
+#   block = typedef.args[3]
+#   prepend!(block.args, get(traits_declarations, parent, Expr[]))
+#   Expr(head, true, Expr(:<:, sym, parent), block) |> esc
+# end
 ###############################################################################
 # end of type traits
 ###############################################################################
@@ -100,12 +254,17 @@ capitalize = uppercase
 Base.find(s::String, c::Union{Char, Vector{Char}, String, Regex}, start = 1) = search(s, c, start)
 
 function Base.delete!(x::Array, key)
-  inds = findfirst(x, key)
   for i in inds
-    deleteat!(x, i)
+    deleteat!(x, findfirst(x, key))
   end
-  x
 end
+
+Base.delete!(a::Array, val) = deleteat!(a, findfirst(a, val))
+
+export deleteall!, remove!, removeall!
+deleteall!(a::Array, val)  = deleteat!(a, find(x -> x==val, a))
+remove!(a::Array, val) = delete!(a, val)
+removeall!(a::Array, val) = deleteall!(a, val)
 
 export hasfield
 hasfield(x, s) = isdefined(x, s)
@@ -123,6 +282,7 @@ end
 
 
 const STYLEPATH = "https://raw.githubusercontent.com/tompollard/phd_thesis_markdown/master/style"
+# const STYLEPATH = "https://raw.githubusercontent.com/AStupidBear/phd_thesis_markdown/master/style"
 
 function thesis(fn, fmt = "pdf"; title = "This is the title of the thesis", name = "Yao Lu")
   if fmt == "pdf"
@@ -153,14 +313,16 @@ function thesis(fn, fmt = "pdf"; title = "This is the title of the thesis", name
     x -> write("template.html", x)
     run(`pandoc $(glob("*.md"))
         -o $fn.html
+        --standalone
         --filter=pandoc-crossref
         --filter=pandoc-citeproc
-        --standalone
+        --template=template.html
         --bibliography=references.bib
         --csl=$STYLEPATH/ref_format.csl
         --include-in-header=style.css
-        --template=template.html
-        --toc`)
+        --toc
+        --number-sections
+        --mathjax`)
     rm("template.html")
     rm("style.css")
   end
@@ -296,7 +458,7 @@ end
 export viewmat
 function viewmat(x)
   fn = tempname() * ".csv"
-  writecsv(fn, vcat(colvec(1:size(x, 2)), x))
+  writecsv(fn, vcat(rowvec(1:size(x, 2)), x))
   is_windows() && spawn(`csvfileview $fn`)
 end
 
@@ -317,9 +479,9 @@ end
 export undersample
 function undersample(xs::Array...; nsample = 2, featuredim = "col")
 	if featuredim == "col"
-		getfun, setfun, countfun = cget, cset!, ccount
+		getfun, setfun, countfun = cview, cset!, ccount
 	elseif featuredim == "row"
-		getfun, setfun, countfun = rget, rset!, rcount
+		getfun, setfun, countfun = rview, rset!, rcount
 	end
   cols = rand(1:countfun(xs[1]), nsample)
   [getfun(x, cols) for x in xs]
@@ -371,13 +533,13 @@ function linux_restore(file)
   run(`tar xf $(abspath(file)) -C /`)
 end
 
-function Base.shuffle(x::AbstractArray, y::AbstractArray; featuredim = "col")
+function Base.shuffle(x::Union{AbstractArray, Tuple}, y::Union{AbstractArray, Tuple}; featuredim = "col")
 	if featuredim == "col"
-		getfun, setfun, countfun = cget, cset!, ccount
+		getfun, setfun, countfun = cview, cset!, ccount
 	elseif featuredim == "row"
-		getfun, setfun, countfun = rget, rset!, rcount
+		getfun, setfun, countfun = rview, rset!, rcount
 	end
-  a = randperm(countfun(x))
+  a = randperm(countfun(y))
   x, y = getfun(x, a), getfun(y, a)
 end
 
@@ -434,19 +596,6 @@ macro replace(ex)
 end
 
 
-export @undict
-"""
-    d = Dict("a"=>[1,2,3], "b" => 2)
-    @undict d a b
-"""
-macro undict(d, exs...)
-  blk = Expr(:block)
-  for ex in exs
-    push!(blk.args, :($ex = $d[$(string(ex))]))
-  end
-  esc(blk)
-end
-
 # """
 # 	X = [([1,2,3],[4,5,6]), ([1,2,3], [4,5,6])]
 # 	vcat(X) == vcat(X...)
@@ -455,7 +604,8 @@ for f in (:vcat, :hcat)
   @eval begin
     function Base.$f(X::Tuple...)
       ntuple(length(X[1])) do j
-        mapreduce(i -> X[i][j], $f, 1:length(X))
+        $f([X[i][j] for i in 1:length(X)]...)
+        # mapreduce(i -> X[i][j], $f, 1:length(X))
       end
     end
   end
@@ -473,7 +623,7 @@ csize(a) = (ndims(a) == 1 ? size(a) : size(a)[1:end-1])
 csize(a, n) = tuple(csize(a)..., n) # size if you had n columns
 clength(a) = (ndims(a) == 1 ? 1 : stride(a, ndims(a)))
 ccount(a) = (ndims(a) == 1 ? length(a) : size(a, ndims(a)))
-cview(a, i) = (ndims(a) == 1 ? (@view a[i]) : view(a, ntuple(i->(:), ndims(a) - 1)..., i))
+cview(a, i) = (ndims(a) == 1 ? a[i] : view(a, ntuple(i->(:), ndims(a) - 1)..., i))
 cget(a, i) = (ndims(a) == 1 ? a[i] : getindex(a, ntuple(i->(:), ndims(a)-1)..., i))
 cset!(a, x, i) = (ndims(a) == 1 ? (a[i] = x) : setindex!(a, x, ntuple(i->(:), ndims(a) - 1)..., i))
 size2(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (stride(y, nd), size(y, nd)))) # size as a matrix
@@ -484,15 +634,24 @@ rsize(a) = (ndims(a)==1 ? size(a) : size(a)[2:end])
 rsize(a, n) = tuple(n, rsize(a)...) # size if you had n columns
 rlength(a) = (ndims(a) == 1 ? length(a) : stride(a, ndims(a)))
 rcount(a) = (ndims(a) == 1 ? length(a) : size(a, 1))
-rview(a, i) = (ndims(a) == 1 ? (@view a[i]) : view(a, i, ntuple(i->(:), ndims(a) - 1)...))
+rview(a, i) = (ndims(a) == 1 ? a[i] : view(a, i, ntuple(i->(:), ndims(a) - 1)...))
 rget(a, i) = (ndims(a) == 1 ? a[i] : getindex(a, i, ntuple(i->(:), ndims(a)-1)...))
 rset!(a, x, i) = (ndims(a)==1 ? (a[i] = x) : setindex!(a, x, i, ntuple(i->(:), ndims(a)-1)...))
 size1(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (size(y, 1), prod(size(y)[2:end])))) # size as a matrix
 size1(y, i) = size1(y)[i]
+
+for s in (:cget, :rget, :cview, :rview)
+  @eval $s(as::Tuple, i) = tuple([$s(a, i) for a in as]...)
+end
+for s in (:cset!, :rset!)
+  @eval $s(as::Tuple, xs::Tuple, i) = for (a, x) in zip(as, xs); $s(a, x, i); end
+end
+
+ccount(x::Tuple) = ccount(x[1])
 ###############################################################################
 # end of cget
 ###############################################################################
-
+Base.similar(x::Tuple) = deepcopy(x)
 export balance
 """
     using Utils
@@ -504,15 +663,15 @@ export balance
 """
 function balance(x, y; featuredim = "col")
 	if featuredim == "col"
-		getfun, setfun, countfun = cget, cset!, ccount
+		getfun, setfun, countfun = cview, cset!, ccount
 	elseif featuredim == "row"
-		getfun, setfun, countfun = rget, rset!, rcount
+		getfun, setfun, countfun = rview, rset!, rcount
 	end
 
   d = Dict()
   for i in eachindex(y)
-    get!(d, getfun(y, i), [getfun(x, i)])
-    push!(d[getfun(y, i)], getfun(x, i))
+    get!(d, y[i], [getfun(x, i)])
+    push!(d[y[i]], getfun(x, i))
   end
 
   xb, yb = similar(x), similar(y)
@@ -538,14 +697,15 @@ function hasnan(x)
   false
 end
 
-function Base.readall(f::IO, T)
+try import Base.readall end
+function readall(f::IO, T)
   x = Vector{T}()
   while !eof(f)
     push!(x, read(f, T))
   end
   x
 end
-function Base.readall(fn::AbstractString, T)
+function readall(fn::AbstractString, T)
   x = Vector{T}()
   open(fn, "r") do f
     while !eof(f); push!(x, read(f, T));  end
@@ -693,12 +853,12 @@ macro param(ex)
   args = ex.args[3].args
   for arg in args
     if arg.head != :line
-      _ = arg.args[2]
-      if isa(_, Expr)
-        push!(bounds, _.args[2])
-        arg.args[2] = _.args[1]
+      tmp = arg.args[2]
+      if isa(tmp, Expr)
+        push!(bounds, tmp.args[2])
+        arg.args[2] = tmp.args[1]
       else
-        push!(bounds, _)
+        push!(bounds, tmp)
       end
     end
   end
@@ -817,9 +977,9 @@ end
 # end of Cloud
 ###############################################################################
 
-export rowvec, colvec
-rowvec(x) = reshape(x, length(x), 1)
-colvec(x) = reshape(x, 1, length(x))
+export colvec, rowvec
+colvec(x) = reshape(x, length(x), 1)
+rowvec(x) = reshape(x, 1, length(x))
 
 export labelplot
 function labelplot(x, label)
@@ -939,32 +1099,67 @@ export MinMaxScaler, fit_transform, fit, transform, inverse_transform
 """
 @with_kw type MinMaxScaler
   sample_dim::Int = 2
-  _max::Array{Float64} = []
-  _min::Array{Float64} = []
+  _max::Array{Float32} = []
+  _min::Array{Float32} = []
 end
 
-function fit_transform(scaler::MinMaxScaler, x; dim = 2)
+function fit_transform(scaler::MinMaxScaler, x, shape = (); dim = 2, reshape = false)
   fit(scaler, x; dim = dim)
   transform(scaler, x)
 end
 
-function fit(scaler::MinMaxScaler, x; dim = 2)
-  scaler.sample_dim = dim
-  scaler._max = maximum(x, 2)
-  scaler._min = minimum(x, 2)
+function fit(scaler::MinMaxScaler, x, shape = (); dim = 2, reshape = false)
+  scaler.sample_dim, scaler._max, scaler._min = dim, maximum(x, 2), minimum(x, 2)
+  return scaler
 end
 
-function transform(scaler::MinMaxScaler, x)
-  y = (x .- scaler._min) ./ (scaler._max .- scaler._min .+ 1e-20)
-end
+transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .- scaler._min) ./ (scaler._max .- scaler._min .+ 1.0f-20)
 
-function inverse_transform(scaler::MinMaxScaler, y)
-  x = y .* (scaler._max .- scaler._min + 1e-20) .+ scaler._min
-end
+inverse_transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = Array{Float32}(x) .* (scaler._max .- scaler._min + 1.0f-20) .+ scaler._min
+
 ###############################################################################
 # end of MinMaxScaler
 ###############################################################################
 
+###############################################################################
+# ShapeScaler
+###############################################################################
+export ShapeScaler, fit_transform, fit, transform, inverse_transform
+
+"""
+    scaler = ShapeScaler()
+    x = ([1 2 3 4; -1 -2 -3 -4; 1 2 3 4; 2 2 3 4], )
+    fit_transform(scaler, x, ((2, 2),))
+    fit_transform(scaler, x, ((2, 2),); reshape = false)
+    fit(scaler, x, ((2, 2),))
+    transform(scaler, x)
+"""
+
+@with_kw type ShapeScaler
+  scalers::Vector{MinMaxScaler} = Vector{MinMaxScaler}()
+  shapes::Tuple = ()
+end
+
+function fit_transform(scaler::ShapeScaler, x, shapes; reshape = false)
+  fit(scaler, x, shapes)
+  transform(scaler, x; reshape = reshape)
+end
+
+function fit(scaler::ShapeScaler, x, shapes)
+  scaler.shapes = shapes
+  for xi in x  push!(scaler.scalers, fit(MinMaxScaler(), xi)) end
+end
+
+function transform(scaler::ShapeScaler, x; reshape = false)
+  ntuple(length(x)) do i
+    xi = transform(scaler.scalers[i], x[i])
+    reshape ? Base.reshape(xi, (scaler.shapes[i]..., ccount(xi))) : xi
+  end
+end
+
+###############################################################################
+# end of ShapeScaler
+###############################################################################
 
 ###############################################################################
 # ImageScaler
@@ -975,28 +1170,25 @@ export ImageScaler, fit_transform, fit, transform, inverse_transform
     scaler = ImageScaler()
     x = [1 2 3 4; -1 -2 -3 -4; 1 2 3 4; 2 2 3 4]
     fit_transform(scaler, x, (2, 2))
-    fit_transform(scaler, x, (2, 2), false)
+    fit_transform(scaler, x, (2, 2); reshape = false)
     fit(scaler, x, (2, 2))
     transform(scaler, x)
 """
 @with_kw type ImageScaler
-  scaler::MinMaxScaler = MinMaxScaler()
-  imagesize::NTuple = ()
+  _max::Float32 = 1
+  shape::NTuple = ()
 end
 
-function fit_transform(scaler::ImageScaler, x, imagesize, reshape = true)
-  fit(scaler, x, imagesize)
-  transform(scaler, x, reshape)
+function fit_transform(scaler::ImageScaler, x, shape; reshape = false)
+  fit(scaler, x, shape)
+  transform(scaler, x; reshape = reshape)
 end
 
-function fit(scaler::ImageScaler, x, imagesize)
-  scaler.imagesize = imagesize
-  fit(scaler.scaler, x)
-end
+fit(scaler::ImageScaler, x, shape) = (scaler.shape = shape; scaler._max = maximum(abs, x))
 
-function transform(scaler::ImageScaler, x, reshape = true)
-  xs = transform(scaler.scaler, x)
-  reshape ? Base.reshape(xs, (scaler.imagesize..., ccount(x))) : xs
+function transform(scaler::ImageScaler, x; reshape = false)
+  xs = Array{Float32}(x) / scaler._max
+  reshape ? Base.reshape(xs, (scaler.shape..., ccount(xs))) : xs
 end
 ###############################################################################
 # end of ImageScaler
@@ -1012,7 +1204,7 @@ macro curry(n, f)
 end
 
 export partial
-partial(f, a...) = ((b...) -> f(a...,b...))
+partial(f, a...; b...) = ((x...; y...) -> f(a..., x...; b..., y...))
 
 
 export @print
@@ -1252,11 +1444,7 @@ end
 
 export @repeat
 macro repeat(n, ex)
-  quote
-    for _ in 1:$n
-      $ex
-    end
-  end
+  Expr(:block, (ex for i in 1:n)...) |> esc
 end
 
 function slow()
@@ -1462,13 +1650,6 @@ function piecewise(x::Symbol,c::Expr,f::Expr)
   return @eval ($x)->($(vf)[findfirst($c)])($x)
 end
 
-export clear_records
-function clear_records(obj)
-  for (key, val) in obj.records
-    empty!(val)
-  end
-end
-
 export @evalat
 macro evalat(m, ex)
   ex1 = parse(":($ex)")
@@ -1504,54 +1685,6 @@ function typreplace!(ex::Expr, r, s)
   end
   ex
 end
-
-export Float
-typealias Float Float64
-
-export dsparse
-function dsparse(A)
-  colptr = A.colptr
-  rowptr = A'.colptr
-  I = rowvals(A)
-  V = nonzeros(A)
-  J = zeros(I)
-  s = 1
-  for j = 1:A.n, i in nzrange(A, j)
-      J[s] = j; s += 1
-  end
-  rowptr, colptr, I, J, V
-end
-
-export record!
-function record!(obj)
-    for (key, val) in obj.records
-        if isa(key, Tuple)
-          sym, ind = key
-          push!(val, getindex(getfield(obj, sym),ind))
-        else
-          push!(val, copy(getfield(obj, key)))
-        end
-    end
-end
-
-export monitor
-function monitor(obj, keys)
-    for key in keys
-        if isa(key, Tuple)
-          sym, ind = key
-        else
-          sym = key
-        end
-        typ = typeof(getfield(obj, sym))
-        obj.records[key] = Vector{typ}()
-    end
-end
-function monitor(objs::Array, keys)
-  for obj in objs
-    monitor(obj, keys)
-  end
-end
-
 
 export @constant
 macro constant(ex)
@@ -1663,13 +1796,17 @@ export seq2stack
     seq2stack(3, x, y, z)
 """
 function seq2stack{T}(tstack::Int, seq::Array{T})
-    stack = zeros(T, size(seq,1) * tstack,
-            size(seq, 2) - tstack + 1)
-    for t = tstack:size(seq,2)
-        stack[:, t-tstack+1] = vec(seq[:, t-tstack+1:t])
+  nr, nc = size(seq)
+  stack = zeros(T, nr * tstack, nc)
+  for t in 1:nc
+    ind = ((t - tstack) * nr + 1):(t * nr)
+    for i in 1:size(stack, 1)
+      stack[i, t] = ind[i] > 0 ? seq[ind[i]] : seq[mod1(i, nr)]
     end
-    return stack
+  end
+  return stack
 end
+
 function seq2stack{T}(tstack::Int, x::Array{T}, ys...)
   xstack = seq2stack(tstack, x)
   ystack = []
@@ -1688,15 +1825,16 @@ end
 
 
 export splitdata
-function splitdata(x, y; featuredim = "col")
+function splitdata(x, y; splitratio = 0.2, featuredim = "col")
 	if featuredim == "col"
-		getfun, setfun, countfun = cget, cset!, ccount
+		getfun, setfun, countfun = cview, cset!, ccount
 	elseif featuredim == "row"
-		getfun, setfun, countfun = rget, rset!, rcount
+		getfun, setfun, countfun = rview, rset!, rcount
 	end
-  n = countfun(x)
-  xtrn, xtst = getfun(x, 1:4*n÷5), getfun(x, 4*n÷5+1:n)
-  ytrn, ytst = getfun(y, 1:4*n÷5), getfun(y, 4*n÷5+1:n)
+  n = countfun(y)
+  s = round(Int, (1 - splitratio) * n)
+  xtrn, xtst = getfun(x, 1:s), getfun(x, (s + 1):n)
+  ytrn, ytst = getfun(y, 1:s), getfun(y, (s + 1):n)
   return  xtrn, ytrn, xtst, ytst
 end
 
@@ -1756,16 +1894,29 @@ function Base.conv2(A::Array{Float64,2},B::Array{Float64,2}, o=:origin)
 		return C[(m1 - 1):(m1 + n1 - 2), (m2 - 1):(m2 + n2 - 2)]
 end
 
-export @dict
+export @symdict
 """
-    a=1; b=2
-    d = @dict(a, b)
+    a = 1; b = 2
+    d = @symdict(a, b)
 """
-macro dict(exs...)
+macro symdict(exs...)
+  expr = Expr(:block,:(d = Dict()))
+  for ex in exs
+    push!(expr.args,:(d[$(QuoteNode(ex))] = $(esc(ex))))
+  end
+  push!(expr.args,:(d))
+  expr
+end
+
+export @strdict
+"""
+    a = 1; b = 2
+    d = @strdict(a, b)
+"""
+macro strdict(exs...)
   expr = Expr(:block,:(d = Dict()))
   for ex in exs
     push!(expr.args,:(d[$(string(ex))] = $(esc(ex))))
-    # push!(expr.args,:(d[$(QuoteNode(ex))] = $(esc(ex))))
   end
   push!(expr.args,:(d))
   expr
@@ -1782,11 +1933,28 @@ function undict(d)
   end
 end
 
+export @undict
+"""
+    d = Dict("a"=>[1,2,3], "b" => 2)
+    @undict d a b
+    d = Dict(:a=>[1,2,3], :b => 2)
+    @undict d a b
+"""
+macro undict(d, exs...)
+  blk = Expr(:block)
+  for ex in exs
+    exquot = QuoteNode(ex)
+    exstr = string(ex)
+    push!(blk.args, :($ex = haskey($d, $exquot) ? $d[$exquot] : $d[$exstr]))
+  end
+  esc(blk)
+end
+
 """
     name = "/tmp/tmp1.txt"
     attach = ["/tmp/tmp1.txt","/tmp/tmp2.txt"]
-    sendmail(name)
-    sendmail(name, attach)
+    mail(name)
+    mail(name, attach)
 """
 function mail(name)
   spawn(pipeline(`cat $name`,`mail -s "Computation Results" luyaocns@gmail.com`))
@@ -1795,24 +1963,24 @@ function mail(name, attach)
   spawn(pipeline(`cat $name`,`mail -s "Computation Results" --attach=$attach luyaocns@gmail.com`))
 end
 
-export @save_output
-macro save_output(ex)
-    quote
-        originalSTDOUT = STDOUT
-        (outRead, outWrite) = redirect_stdout()
-        $(esc(ex))
-        close(outWrite)
-        data = String(readavailable(outRead))
-        close(outRead)
-        redirect_stdout(originalSTDOUT)
-        println(data)
-        open("/tmp/temp.txt","w") do fh
-            write(fh, "Subject: Terminal Email Send\n\n")
-            write(fh, data)
-        end
-	      spawn(`bash /home/hdd1/YaoLu/Backup/sendmail.sh`)
-    end
-end
+# export @save_output
+# macro save_output(ex)
+#     quote
+#         originalSTDOUT = STDOUT
+#         (outRead, outWrite) = redirect_stdout()
+#         $(esc(ex))
+#         close(outWrite)
+#         data = String(readavailable(outRead))
+#         close(outRead)
+#         redirect_stdout(originalSTDOUT)
+#         println(data)
+#         open("/tmp/temp.txt","w") do fh
+#             write(fh, "Subject: Terminal Email Send\n\n")
+#             write(fh, data)
+#         end
+# 	      spawn(`bash /home/hdd1/YaoLu/Backup/sendmail.sh`)
+#     end
+# end
 
 macro save(name,ex)
   name = string(name)
