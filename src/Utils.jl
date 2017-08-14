@@ -1,5 +1,5 @@
 module Utils
-__precompile__()
+# __precompile__()
 
 ###############################################################################
 # begin of load packages
@@ -36,22 +36,54 @@ export glob
 # end of load packages
 ###############################################################################
 
-# function fastsrand(seed)
-#     global GSEED
-#     GSEED = seed
-# end
-
-# @inline function fastrand(GSEED)
-#     GSEED = UInt32(214013) * GSEED + UInt32(2531011)
-#     return GSEED, (GSEED >> UInt(16)) & 0x7FFF
-# end
-
-export mat2img
-function mat2img(A)
-  @eval using Images
-  colorview(RGB, permuteddimsview(A, (3, 1, 2)))
+macro logto(fn)
+  quote
+    logstream = open(joinpath(tempdir(), $fn * ".log"), "w")
+    Logging.configure(output = [logstream, STDOUT], level = Logging.DEBUG)
+  end |> esc
 end
 
+if VERSION <= v"0.5.2"
+  Base.reshape(parent::AbstractArray, dims::Int...) = reshape(parent, dims)
+  Base.reshape(parent::AbstractArray, dims::Union{Int,Colon}...) = reshape(parent, dims)
+  Base.reshape(parent::AbstractArray, dims::Tuple{Vararg{Union{Int,Colon}}}) = Base._reshape(parent, _reshape_uncolon(parent, dims))
+  # Recursively move dimensions to pre and post tuples, splitting on the Colon
+  @inline _reshape_uncolon(A, dims) = _reshape_uncolon(A, (), nothing, (), dims)
+  @inline _reshape_uncolon(A, pre, c::Void,  post, dims::Tuple{Any, Vararg{Any}}) =
+      _reshape_uncolon(A, (pre..., dims[1]), c, post, tail(dims))
+  @inline _reshape_uncolon(A, pre, c::Void,  post, dims::Tuple{Colon, Vararg{Any}}) =
+      _reshape_uncolon(A, pre, dims[1], post, Base.tail(dims))
+  @inline _reshape_uncolon(A, pre, c::Colon, post, dims::Tuple{Any, Vararg{Any}}) =
+      _reshape_uncolon(A, pre, c, (post..., dims[1]), Base.tail(dims))
+  _reshape_uncolon(A, pre, c::Colon, post, dims::Tuple{Colon, Vararg{Any}}) =
+      throw(DimensionMismatch("new dimensions $((pre..., c, post..., dims...)) may only have at most one omitted dimension specified by Colon()"))
+  @inline function _reshape_uncolon(A, pre, c::Colon, post, dims::Tuple{})
+      sz, remainder = divrem(length(A), prod(pre)*prod(post))
+      remainder == 0 || _throw_reshape_colon_dimmismatch(A, pre, post)
+      (pre..., sz, post...)
+    end
+  _throw_reshape_colon_dimmismatch(A, pre, post) =
+      throw(DimensionMismatch("array size $(length(A)) must be divisible by the product of the new dimensions $((pre..., :, post...))"))
+end
+
+export @raw_str
+macro raw_str(s)
+    s
+end
+
+export mat2img, img2mat, vec2rgb
+
+function mat2img(A)
+  @eval using Images
+  colorview(RGB, permutedims(A, (3, 1, 2)))
+end
+
+function img2mat(A)
+  @eval using Images
+  @> A channelview permutedims((2, 3, 1))
+end
+
+vec2rgb(x) = (W = Int(√(length(x) ÷ 3)); reshape(x, W, W, 3))
 
 export pmapreduce
 pmapreduce(f, op, iter) = reduce(op, pmap(f, iter))
@@ -100,7 +132,6 @@ macro pygen(f)
 end
 
 
-ENV["JULIA_EDITOR"] = "code"
 function Base.edit(path::AbstractString, line::Integer=0)
     command = Base.editor()
     name = basename(first(command))
@@ -492,7 +523,8 @@ plus(x::Real) = ifelse(x > 0, one(x), zero(x))
 minus(x::Real) = ifelse(x < 0, oftype(x, -1), zero(x))
 
 export splat
-splat(x) = @as _ x collect.(_) vec.(_) vcat(_...)
+# splat(x) = @as _ x collect.(_) vec.(_) vcat(_...)
+splat(list) = [item for sublist in list for item in sublist]
 
 export git, jgit
 jgit() = git(pwd(), ".jl")
@@ -610,11 +642,6 @@ for f in (:vcat, :hcat)
     end
   end
 end
-# function Base.vcat(X::Tuple...)
-#   ntuple(length(X[1])) do j
-#     mapreduce(i -> X[i][j], vcat, 1:length(X))
-#   end
-# end
 ###############################################################################
 # end of cget
 ###############################################################################
