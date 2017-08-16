@@ -4,8 +4,7 @@ module Utils
 ###############################################################################
 # begin of load packages
 ###############################################################################
-using Reexport
-export @reexport
+using Reexport; export @reexport
 
 @reexport using Suppressor
 
@@ -15,14 +14,11 @@ export @reexport
 
 import StatsBase
 
-using DataFrames
-export DataFrame, aggregate, describe, by, combine, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna
+using DataFrames; export DataFrame, aggregate, describe, by, combine, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna
 
-using Lazy: @as, @>, @>>
-export @as, @>, @>>
+using Lazy: @as, @>, @>>; export @as, @>, @>>
 
-using Glob
-export glob
+using Glob; export glob
 
 @reexport using PyCall
 
@@ -1140,9 +1136,9 @@ function fit(scaler::MinMaxScaler, x, shape = (); dim = 2, reshape = false)
   return scaler
 end
 
-transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .- scaler._min) ./ (scaler._max .- scaler._min .+ 1.0f-20)
+transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .- scaler._min) ./ (scaler._max .- scaler._min .+ 1.0f-20) .- 0.5f0
 
-inverse_transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = Array{Float32}(x) .* (scaler._max .- scaler._min + 1.0f-20) .+ scaler._min
+inverse_transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .+ 0.5f0) .* (scaler._max .- scaler._min + 1.0f-20) .+ scaler._min
 
 ###############################################################################
 # end of MinMaxScaler
