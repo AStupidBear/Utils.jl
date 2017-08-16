@@ -20,8 +20,6 @@ using Lazy: @as, @>, @>>; export @as, @>, @>>
 
 using Glob; export glob
 
-@reexport using PyCall
-
 @reexport using Polynomials
 
 @reexport using Parameters

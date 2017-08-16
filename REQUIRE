@@ -7,7 +7,6 @@ StatsBase
 DataFrames
 Lazy
 Glob
-PyCall
 Polynomials
 Parameters
 MacroTools
