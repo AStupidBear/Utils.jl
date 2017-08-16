@@ -84,14 +84,6 @@ vec2rgb(x) = (W = Int(√(length(x) ÷ 3)); reshape(x, W, W, 3))
 export pmapreduce
 pmapreduce(f, op, iter) = reduce(op, pmap(f, iter))
 
-function install(usrnm, pkg)
-  if !isdir(Pkg.dir(pkg))
-    Pkg.rm(pkg)
-    Pkg.clone("https://github.com/$usrnm/$pkg.jl.git")
-    Pkg.build(pkg)
-  end
-end
-
 Base.vec(x::Number) = fill(x, 1)
 Base.vec(x::Symbol) = fill(x, 1)
 Base.vec(x::Expr) = x.args
