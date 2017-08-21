@@ -674,7 +674,7 @@ export balance
     hist1(y, -1.5:1.5)
     hist1(yb, -1.5:1.5)
 """
-function balance(x, y; featuredim = "col")
+function balance(x, y; featuredim = "col", sampleratio = 1.0)
 	if featuredim == "col"
 		getfun, setfun, countfun = cview, cset!, ccount
 	elseif featuredim == "row"
@@ -690,7 +690,7 @@ function balance(x, y; featuredim = "col")
   xb, yb = similar(x), similar(y)
   ny, key, vals = length(d), collect(keys(d)), collect(values(d))
 
-  for i in 1:length(y)
+  for i in 1:Int(length(y) * sampleratio)
     r = rand(1:ny)
     setfun(yb, key[r], i)
     setfun(xb, rand(vals[r]), i)
@@ -742,69 +742,7 @@ minute() = @> string(now())[1:16] replace(":", "-")
 export timename
 timename(fn) = joinpath(tempdir(), minute() * "_" * fn)
 
-###############################################################################
-# BoundEncoder
-###############################################################################
-Base.rand(b::NTuple{2, Real}, dims...) = b[1] + rand(dims...) * (b[2] - b[1])
 
-export purturb
-function purturb(x, X, bounds)
-  for j in 1:size(X, 2)
-    if isapprox(x, X[:, j])
-      for i in 1:length(x)
-        x[i] += rand(bounds[i])
-      end
-    end
-  end
-  x
-end
-
-tobound(b) = b
-tobound(b::Vector) = 1:length(b)
-
-discretize(c::Range, x) = @as _ x indmin(abs2(_ .- c)) c[_]
-discretize(c::NTuple{2, Number}, x) = x < c[1] ? c[1] :
-                                    x > c[2] ? c[2] : x
-discretize(c::Vector, x) = (i = discretize(1:length(c), x); c[i])
-
-export BoundEncoder, transform
-
-type BoundEncoder
-  configs::Tuple
-  bounds::Array{NTuple{2, Float64}}
-end
-
-function BoundEncoder(configs)
-  bounds = []
-  for c in configs
-    length(c) > 1 && push!(bounds, tobound(c))
-  end
-  configs = tuple(configs...)
-  bounds = [Float64.(extrema(b)) for b in bounds]
-  BoundEncoder(configs, bounds)
-end
-
-function transform(encoder::BoundEncoder, x)
-  i = 0; c = []
-  for cc in encoder.configs
-    push!(c, length(cc) > 1 ? (i += 1; discretize(cc, x[i])) : cc)
-  end
-  c
-end
-
-function inverse_transform(encoder::BoundEncoder, c)
-  x = Float64[c[i] for i in eachindex(c) if length(encoder.configs[i]) > 1]
-end
-
-# configs = ((-1, 1), 1, 1:10, ["1", 3, 2])
-# encoder = BoundEncoder(configs)
-# x = [0, 5.3, 3]
-# c = transform(encoder, x)
-# @assert x == inverse_transform(encoder, c)
-
-###############################################################################
-# end of BoundEncoder
-###############################################################################
 export histn
 "c, w = histn(rand(10), rand(10), rand(10))"
 function histn(xs::Array...; o...)
@@ -1458,31 +1396,6 @@ end
 export @repeat
 macro repeat(n, ex)
   Expr(:block, (ex for i in 1:n)...) |> esc
-end
-
-function slow()
-    a = 1.0
-    for i in 1:10000
-        for j in 1:10000
-            a+=asinh(i+j)
-        end
-    end
-    return a
-end
-
-export rosenbrock
-function rosenbrock(x)
-  x = collect(x)
-  z = sum( 100*( x[2:end] .- x[1:end-1].^2 ).^2 .+ ( x[1:end-1] .- 1 ).^2 )
-  Float64(z)
-end
-
-# fmin = -1.04
-export branin
-function branin(v)
-    x, y = v
-    x, y = 15x - 5, 15y
-    res = 1/51.95 * ((y - 5.1*x^2 / (4*π^2) + 5x/π - 6)^2 + (10 -10/8π)cos(x) -44.81)
 end
 
 """
