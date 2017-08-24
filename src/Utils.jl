@@ -26,9 +26,34 @@ using Glob; export glob
 
 @reexport using MacroTools
 
+@reexport using NamedTuples
+
 ###############################################################################
 # end of load packages
 ###############################################################################
+
+export nt
+macro nt(exs...)
+  esc(:(@NT($(exs...))($(exs...))))
+end
+
+export @unstruct
+macro unstruct(typ)
+    blk = Expr(:block)
+    for f in fieldnames(eval(current_module(), typ))
+        push!(blk.args, :($f = getfield($typ, $(QuoteNode(f)))))
+    end
+    esc(blk)
+end
+
+macro unstruct(typ, exs...)
+  blk = Expr(:block)
+  for ex in exs
+    exquot = QuoteNode(ex)
+    push!(blk.args, :($ex =getfield($typ, $exquot)))
+  end
+  esc(blk)
+end
 
 macro logto(fn)
   quote
@@ -593,6 +618,15 @@ macro info(ex)
   :($x = $ex; info($x); $x) |> esc
 end
 
+function args2field(args)
+    fields = Symbol[]
+    for arg in args
+      @capture(arg, (f_::typ_=val_)|(f_::typ_)|(f_=val_))
+      f != nothing && push!(fields, f)
+    end
+    return fields
+end
+
 export @replace
 macro replace(ex)
     ex = macroexpand(ex)
@@ -604,15 +638,16 @@ macro replace(ex)
             push!(typs, sym.args[2])
         end
     end
-    for (typ,n) in zip(typs, names)
-        for f in fieldnames(eval(current_module(),typ))
+    for (typ, n) in zip(typs, names)
+        field = fieldnames(eval(current_module(), typ))
+        append!(field, args2field(get(traits_declarations, typ, Symbol[])))
+        for f in field
             exreplace!(ex.args[2], :($f), :($n.$f))
         end
     end
     # @show ex
     esc(ex)
 end
-
 
 # """
 # 	X = [([1,2,3],[4,5,6]), ([1,2,3], [4,5,6])]
@@ -682,20 +717,21 @@ function balance(x, y; featuredim = "col", sampleratio = 1.0)
 	end
 
   d = Dict()
-  for i in eachindex(y)
+  for i in 1:ccount(x)
     get!(d, y[i], [getfun(x, i)])
     push!(d[y[i]], getfun(x, i))
   end
 
-  xb, yb = similar(x), similar(y)
-  ny, key, vals = length(d), collect(keys(d)), collect(values(d))
+  nb = Int(countfun(x) * sampleratio); yb = zeros(nb)
+  xb = featuredim == "col" ? zeros(size(x, 1), nb) : zeros(nb, size(x, 2))
 
-  for i in 1:Int(length(y) * sampleratio)
+  ny, key, vals = length(d), collect(keys(d)), collect(values(d))
+  for i in 1:nb
     r = rand(1:ny)
     setfun(yb, key[r], i)
     setfun(xb, rand(vals[r]), i)
   end
-	xb, yb
+  return xb, yb
 end
 
 
