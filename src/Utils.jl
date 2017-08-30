@@ -12,9 +12,7 @@ using Reexport; export @reexport
 
 @reexport using ClobberingReload
 
-import StatsBase
-
-using DataFrames; export DataFrame, aggregate, describe, by, combine, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna
+import StatsBase; export StatsBase
 
 using Lazy: @as, @>, @>>; export @as, @>, @>>
 
@@ -28,11 +26,107 @@ using Glob; export glob
 
 @reexport using NamedTuples
 
+@reexport using TypedTables
+
+using DataFrames; export DataFrames, DataFrame
+# export DataFrame, aggregate, describe, by, combine, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna, columns
+
+# @static if is_windows() include("wincall.jl") end
+# export CreateProcess
 ###############################################################################
 # end of load packages
 ###############################################################################
 
-export nt
+###############################################################################
+# begin of TypedTables
+###############################################################################
+
+import TypedTables: @Table, @Row
+
+macro Table(exprs...)
+    N = length(exprs)
+    names = Vector{Any}(N)
+    values = Vector{Any}(N)
+    for i = 1:N
+        expr = exprs[i]
+		if isa(expr, Symbol)
+			names[i] = expr
+			values[i] = esc(expr)
+        elseif isa(expr.args[1],Symbol)
+            names[i] = (expr.args[1])
+            values[i] = esc(expr.args[2])
+        elseif isa(expr.args[1],Expr)
+            if expr.args[1].head != :(::) || length(expr.args[1].args) != 2
+                error("A Expecting expression like @Table(name1::Type1 = value1, name2::Type2 = value2) or @Table(name1 = value1, name2 = value2)")
+            end
+            names[i] = (expr.args[1].args[1])
+            values[i] = esc(Expr(:call, :convert, expr.args[1].args[2], expr.args[2]))
+        else
+            error("A Expecting expression like @Table(name1::Type1 = value1, name2::Type2 = value2) or @Table(name1 = value1, name2 = value2)")
+        end
+    end
+    tabletype = TypedTables.Table{(names...)}
+    return Expr(:call, tabletype, Expr(:tuple, values...))
+end
+
+macro Row(exprs...)
+    N = length(exprs)
+    names = Vector{Any}(N)
+    values = Vector{Any}(N)
+    for i = 1:N
+        expr = exprs[i]
+		if isa(expr, Symbol)
+			names[i] = expr
+			values[i] = esc(expr)
+        elseif isa(expr.args[1],Symbol)
+            names[i] = (expr.args[1])
+            values[i] = esc(expr.args[2])
+        elseif isa(expr.args[1],Expr)
+            if expr.args[1].head != :(::) || length(expr.args[1].args) != 2
+                error("A Expecting expression like @Row(name1::Type1 = value1, name2::Type2 = value2) or @Row(name1 = value1, name2 = value2)")
+            end
+            names[i] = (expr.args[1].args[1])
+            values[i] = esc(Expr(:call, :convert, expr.args[1].args[2], expr.args[2]))
+        else
+            error("A Expecting expression like @Row(name1::Type1 = value1, name2::Type2 = value2) or @Row(name1 = value1, name2 = value2)")
+        end
+    end
+    rowtype = TypedTables.Row{(names...)}
+    return Expr(:call, rowtype, Expr(:tuple, values...))
+end
+
+DataFrames.DataFrame{Names, StorageTypes}(tbl::TypedTables.Table{Names, StorageTypes}) = DataFrame(collect(tbl.data), collect(Names))
+
+TypedTables.Table(df::DataFrame) = Table(DataFrames.columns(df), names(df))
+
+function TypedTables.Table(column_eltypes::Vector{DataType}, names::Vector{Symbol})
+	column_types =Tuple{[Vector{typ} for typ in column_eltypes]...}
+	Table{tuple(names...), column_types}()
+end
+
+function TypedTables.Table(columns::Vector, names::Vector{Symbol})
+	Table{tuple(names...)}(tuple(columns...))
+end
+
+function Base.push!(tbl::TypedTables.Table, row)
+	for (col, val) in zip(tbl.data, row)
+		push!(col, val)
+	end
+end
+
+Base.Matrix(tbl::TypedTables.Table) = hcat(tbl.data...)
+
+Base.writedlm(f::AbstractString, tbl::TypedTables.Table, delim = ','; opts...) = writedlm(f, Matrix(tbl), delim; opts...)
+
+###############################################################################
+# end of TypedTables
+###############################################################################
+
+###############################################################################
+# begin of macros
+###############################################################################
+
+export @nt
 macro nt(exs...)
   esc(:(@NT($(exs...))($(exs...))))
 end
@@ -54,6 +148,66 @@ macro unstruct(typ, exs...)
   end
   esc(blk)
 end
+
+export @symdict
+"""
+    a = 1; b = 2
+    d = @symdict(a, b)
+"""
+macro symdict(exs...)
+  expr = Expr(:block,:(d = Dict()))
+  for ex in exs
+    push!(expr.args,:(d[$(QuoteNode(ex))] = $(esc(ex))))
+  end
+  push!(expr.args,:(d))
+  expr
+end
+
+export @strdict
+"""
+    a = 1; b = 2
+    d = @strdict(a, b)
+"""
+macro strdict(exs...)
+  expr = Expr(:block,:(d = Dict()))
+  for ex in exs
+    push!(expr.args,:(d[$(string(ex))] = $(esc(ex))))
+  end
+  push!(expr.args,:(d))
+  expr
+end
+
+export undict
+"""
+    d=Dict(:a=>1,:b=>2)
+    undict(d)
+"""
+function undict(d)
+  for (key, val) in d
+    eval(current_module(),:($(key)=$val))
+  end
+end
+
+export @undict
+"""
+    d = Dict("a"=>[1,2,3], "b" => 2)
+    @undict d a b
+    d = Dict(:a=>[1,2,3], :b => 2)
+    @undict d a b
+"""
+macro undict(d, exs...)
+  blk = Expr(:block)
+  for ex in exs
+    exquot = QuoteNode(ex)
+    exstr = string(ex)
+    push!(blk.args, :($ex = haskey($d, $exquot) ? $d[$exquot] : $d[$exstr]))
+  end
+  esc(blk)
+end
+
+###############################################################################
+# end of macros
+###############################################################################
 
 macro logto(fn)
   quote
@@ -775,6 +929,9 @@ centralize(x, dim = 1) = centralize!(deepcopy(x), dim)
 export minute
 minute() = @> string(now())[1:16] replace(":", "-")
 
+export date
+date() = string(now())[1:10]
+
 export timename
 timename(fn) = joinpath(tempdir(), minute() * "_" * fn)
 
@@ -841,7 +998,7 @@ macro param(ex)
   for arg in args
     if arg.head != :line
       tmp = arg.args[2]
-      if isa(tmp, Expr)
+      if isa(tmp, Expr) && tmp.head == :(=>)
         push!(bounds, tmp.args[2])
         arg.args[2] = tmp.args[1]
       else
@@ -897,8 +1054,7 @@ end
 
 
 export unroll
-unroll(x, name) = [getfield(x, s) for s in fieldnames(x) if
-                  contains(string(s), string(name))]
+unroll(x, name) = [getfield(x, s) for s in fieldnames(x) if contains(string(s), string(name))]
 
 ###############################################################################
 # end of Parameter
@@ -1856,61 +2012,6 @@ function Base.conv2(A::Array{Float64,2},B::Array{Float64,2}, o=:origin)
 		return C[(m1 - 1):(m1 + n1 - 2), (m2 - 1):(m2 + n2 - 2)]
 end
 
-export @symdict
-"""
-    a = 1; b = 2
-    d = @symdict(a, b)
-"""
-macro symdict(exs...)
-  expr = Expr(:block,:(d = Dict()))
-  for ex in exs
-    push!(expr.args,:(d[$(QuoteNode(ex))] = $(esc(ex))))
-  end
-  push!(expr.args,:(d))
-  expr
-end
-
-export @strdict
-"""
-    a = 1; b = 2
-    d = @strdict(a, b)
-"""
-macro strdict(exs...)
-  expr = Expr(:block,:(d = Dict()))
-  for ex in exs
-    push!(expr.args,:(d[$(string(ex))] = $(esc(ex))))
-  end
-  push!(expr.args,:(d))
-  expr
-end
-
-export undict
-"""
-    d=Dict(:a=>1,:b=>2)
-    undict(d)
-"""
-function undict(d)
-  for (key, val) in d
-    eval(current_module(),:($(key)=$val))
-  end
-end
-
-export @undict
-"""
-    d = Dict("a"=>[1,2,3], "b" => 2)
-    @undict d a b
-    d = Dict(:a=>[1,2,3], :b => 2)
-    @undict d a b
-"""
-macro undict(d, exs...)
-  blk = Expr(:block)
-  for ex in exs
-    exquot = QuoteNode(ex)
-    exstr = string(ex)
-    push!(blk.args, :($ex = haskey($d, $exquot) ? $d[$exquot] : $d[$exstr]))
-  end
-  esc(blk)
-end
 
 """
     name = "/tmp/tmp1.txt"

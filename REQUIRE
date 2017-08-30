@@ -12,3 +12,5 @@ Parameters
 MacroTools
 Logging
 NamedTuples
+TypedTables
+LegacyStrings
