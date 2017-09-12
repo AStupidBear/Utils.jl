@@ -1,5 +1,5 @@
 module Utils
-# __precompile__()
+__precompile__()
 
 ###############################################################################
 # begin of load packages
@@ -36,6 +36,15 @@ using DataFrames; export DataFrames, DataFrame
 ###############################################################################
 # end of load packages
 ###############################################################################
+
+macro mpijob()
+    quote
+        using MPI
+        MPI.Init()
+        mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
+        comm_size = MPI.Comm_size(MPI.COMM_WORLD)
+    end |> esc
+end
 
 ###############################################################################
 # begin of TypedTables
@@ -794,7 +803,7 @@ macro replace(ex)
     end
     for (typ, n) in zip(typs, names)
         field = fieldnames(eval(current_module(), typ))
-        append!(field, args2field(get(traits_declarations, typ, Symbol[])))
+        field = union(field, args2field(get(traits_declarations, typ, Symbol[])))
         for f in field
             exreplace!(ex.args[2], :($f), :($n.$f))
         end
