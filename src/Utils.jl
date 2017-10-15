@@ -1,5 +1,6 @@
-module Utils
 __precompile__()
+
+module Utils
 
 ###############################################################################
 # begin of load packages
@@ -8,11 +9,11 @@ using Reexport; export @reexport
 
 @reexport using Suppressor
 
-@reexport using BenchmarkTools
+# @reexport using BenchmarkTools
 
-@reexport using ClobberingReload
+# @reexport using ClobberingReload
 
-import StatsBase; export StatsBase
+import StatsBase
 
 using Lazy: @as, @>, @>>; export @as, @>, @>>
 
@@ -31,20 +32,143 @@ using Glob; export glob
 using DataFrames; export DataFrames, DataFrame
 # export DataFrame, aggregate, describe, by, combine, groupby, nullable!, readtable, rename!, rename, tail, writetable, dropna, columns
 
-# @static if is_windows() include("wincall.jl") end
-# export CreateProcess
+using MLKernels
+
+@reexport using DataStructures
 ###############################################################################
 # end of load packages
 ###############################################################################
 
-macro mpijob()
-    quote
-        using MPI
-        MPI.Init()
-        mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
-        comm_size = MPI.Comm_size(MPI.COMM_WORLD)
-    end |> esc
+###############################################################################
+# begin of kernel
+###############################################################################
+export Nystroem, fit, transform
+type Nystroem{T}
+    kernel::Kernel{T}
+    n_components::Int
+    random_state::Int
+    normalization::Matrix{T}
+    components::Matrix{T}
 end
+
+Nystroem(;γ = 0.2, n_components = 30, random_state = 0) = Nystroem(GaussianKernel(γ), n_components, random_state, zeros(typeof(γ), 0, 0), zeros(typeof(γ), 0, 0))
+
+@noinline function transform(estimator::Nystroem, X)
+    embedded = kernelmatrix(estimator.kernel, X, estimator.components)
+    A_mul_Bt(embedded, estimator.normalization)
+end
+
+function fit{T}(estimator::Nystroem{T}, X)
+    X = unique(X, 1)
+    srand(estimator.random_state)
+    n_samples = size(X, 1)
+    n_components = min(n_samples, estimator.n_components)
+    basis_inds = randperm(n_samples)[1:n_components]
+    basis = X[basis_inds, :]
+    K = kernelmatrix(estimator.kernel, basis)
+    U, S, V = svd(K); S = max(S, 1e-12)
+    estimator.normalization = A_mul_Bt(U ./ sqrt(S.'), V)
+    estimator.components = basis
+end
+
+###############################################################################
+# end of kernel
+###############################################################################
+
+grad1(x) = [mapslices(diff, x, dim) for dim in 1:ndims(x)]
+
+grad2(x) = grad1.(grad1(x))
+
+###############################################################################
+# end of cloud computing
+###############################################################################
+function disablecache()
+    pkgs = readdir(Pkg.dir())
+    pkgs = symdiff(pkgs, ["METADATA", "META_BRANCH", "REQUIRE", ".cache", ".trash"])
+    for pkg in pkgs
+        modulefile = joinpath(Pkg.dir(pkg), "src", pkg * ".jl")
+        code = readstring(modulefile)
+        code = replace(code, "__precompile__()", "__precompile__(false)")
+        code = replace(code, "__precompile__(true)", "__precompile__(false)")
+        write(modulefile, code)
+    end
+end
+
+hostnames(pool = workers())  = pmap(WorkerPool(pool), x -> readlines(`hostname`), 1:length(pool))
+
+export @headnode
+macro headnode(ex)
+    quote
+        @everywhere using Utils
+        nodes = hostnames()
+        @sync @parallel for i in 1:length(workers())
+            if i == findfirst(x -> x == nodes[i], nodes)
+                $(esc(ex))
+            end
+        end
+    end
+end
+
+export aws_setup
+function aws_setup(n = 0)
+    Sys.CPU_CORES > 2 && return
+    @eval using ClusterManagers; addprocs_qrsh(n)
+    @headnode begin
+        try run(`sudo mkfs -t ext4  /dev/nvme0n1`) end
+        try run(`sudo mkdir /scratch`) end
+        try run(`sudo mount /dev/nvme0n1 /scratch`) end
+        run(`awk 'BEGIN {cmd="sudo cp -ri /shared/Data /scratch/"; print "n" |cmd;}'`)
+        run(`sudo chmod -R ugo+rw /scratch`)
+    end
+end
+
+export scc_setup
+function scc_setup()
+    if Sys.CPU_CORES > 8 && !contains(readstring(`hostname`), "highchain")
+        @eval begin
+            using MPI
+            MPI.Init()
+            mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
+        end
+    end
+end
+
+export scc_end
+function scc_end()
+    isdefined(Main, :MPI) && @everywhere (MPI.Finalize(); exit())
+    exit()
+end
+
+
+function getjobid(cmd)
+    println(string(cmd)[2:end-1])
+    jobstr = readstring(cmd)
+    jobid = match(r"<(\d+)>", jobstr).captures[1]
+end
+
+bkill(ids) = for id in ids try run(`bkill $id`) end end
+
+export bsub
+function bsub(;queue = "smallopa", subqueue = queue, n = 28, fn = "main")
+    jobid = getjobid(`bsub -q $queue -n $n -oo $fn.log -eo $fn.err echo`)
+    local nodes
+    while true
+        jobs = readstring(`bjobs $jobid`)
+        nodes = [m.match for m in eachmatch(r"node(\d+)", jobs)]
+        nodes = setdiff(nodes, [readchomp(`hostname`)])
+        !isempty(nodes) && break
+        sleep(1)
+    end
+    write("$(fn)_compile.jl", readline("$fn.jl"), "using MPI; exit()")
+    jobids = [getjobid(`bsub -q $subqueue -m $node -eo $node.err julia $(fn)_compile.jl`) for node in nodes]
+    w = join(["done($jobid)" for jobid in jobids], "&&")
+    nodes = join(nodes, " ")
+    run(`bsub -q $queue -n $n -w $w -m $nodes -oo $fn.log -eo $fn.err -J $fn mpijob-new julia $fn.jl`)
+end
+
+###############################################################################
+# end of cloud computing
+###############################################################################
 
 ###############################################################################
 # begin of TypedTables
@@ -225,33 +349,8 @@ macro logto(fn)
   end |> esc
 end
 
-if VERSION <= v"0.5.2"
-  Base.reshape(parent::AbstractArray, dims::Int...) = reshape(parent, dims)
-  Base.reshape(parent::AbstractArray, dims::Union{Int,Colon}...) = reshape(parent, dims)
-  Base.reshape(parent::AbstractArray, dims::Tuple{Vararg{Union{Int,Colon}}}) = Base._reshape(parent, _reshape_uncolon(parent, dims))
-  # Recursively move dimensions to pre and post tuples, splitting on the Colon
-  @inline _reshape_uncolon(A, dims) = _reshape_uncolon(A, (), nothing, (), dims)
-  @inline _reshape_uncolon(A, pre, c::Void,  post, dims::Tuple{Any, Vararg{Any}}) =
-      _reshape_uncolon(A, (pre..., dims[1]), c, post, tail(dims))
-  @inline _reshape_uncolon(A, pre, c::Void,  post, dims::Tuple{Colon, Vararg{Any}}) =
-      _reshape_uncolon(A, pre, dims[1], post, Base.tail(dims))
-  @inline _reshape_uncolon(A, pre, c::Colon, post, dims::Tuple{Any, Vararg{Any}}) =
-      _reshape_uncolon(A, pre, c, (post..., dims[1]), Base.tail(dims))
-  _reshape_uncolon(A, pre, c::Colon, post, dims::Tuple{Colon, Vararg{Any}}) =
-      throw(DimensionMismatch("new dimensions $((pre..., c, post..., dims...)) may only have at most one omitted dimension specified by Colon()"))
-  @inline function _reshape_uncolon(A, pre, c::Colon, post, dims::Tuple{})
-      sz, remainder = divrem(length(A), prod(pre)*prod(post))
-      remainder == 0 || _throw_reshape_colon_dimmismatch(A, pre, post)
-      (pre..., sz, post...)
-    end
-  _throw_reshape_colon_dimmismatch(A, pre, post) =
-      throw(DimensionMismatch("array size $(length(A)) must be divisible by the product of the new dimensions $((pre..., :, post...))"))
-end
-
 export @raw_str
-macro raw_str(s)
-    s
-end
+macro raw_str(s) s end
 
 export mat2img, img2mat, vec2rgb
 
@@ -277,21 +376,17 @@ Base.vec(x::Expr) = x.args
 export @pygen
 
 macro pygen(f)
-
     # generate a new symbol for the channel name and
     # wrapper function
     c = gensym()
     η = gensym()
-
     # yield(λ) → put!(c, λ)
     f′ = MacroTools.postwalk(f) do x
         @capture(x, yield(λ_)) || return x
         return :(put!($c, $λ))
     end
-
     # Fetch the function name and args
     @capture(f′, function func_(args__) body_ end)
-
     # wrap up the η function
     final = quote
         function $func($(args...))
@@ -301,7 +396,6 @@ macro pygen(f)
             return Channel(c -> $η(c))
         end
     end
-
     return esc(final)
 end
 
@@ -347,7 +441,7 @@ function confusmat(ul, y, ypred)
   encoder = LabelEncoder(ul)
   ypred_int = transform(encoder, ypred) + 1
   y_int = transform(encoder, y) + 1
-  R = Int[countnz((y_int .== i) & (ypred_int .== j)) for i in 1:len(ul), j in 1:len(ul)]
+  R = Int[countnz((y_int .== i) .& (ypred_int .== j)) for i in 1:len(ul), j in 1:len(ul)]
   mat = Any["gt/pred" ul'; Any[ul R]]
 end
 
@@ -373,7 +467,7 @@ macro correct(ex)
   res = gensym()
   :($res = try $ex end; $res == nothing ? false : $res) |> esc
 end
-``
+
 export ntry
 macro ntry(ex, n = 1000)
 	:(for t in 1:$n
@@ -426,7 +520,7 @@ macro mixin(typedef)
     parentfields = get(traits_declarations, parent, Expr[])
     append!(block.args, parentfields)
   end
-  field = Dict()
+  field = OrderedDict()
   for arg in block.args
     @capture(arg, (f_::typ_=val_)|(f_::typ_)|(f_=val_))
     f == nothing && (f = deepcopy(arg))
@@ -457,12 +551,6 @@ export capitalize
 capitalize = uppercase
 
 Base.find(s::String, c::Union{Char, Vector{Char}, String, Regex}, start = 1) = search(s, c, start)
-
-function Base.delete!(x::Array, key)
-  for i in inds
-    deleteat!(x, findfirst(x, key))
-  end
-end
 
 Base.delete!(a::Array, val) = deleteat!(a, findfirst(a, val))
 
@@ -909,7 +997,6 @@ function hasnan(x)
   false
 end
 
-try import Base.readall end
 function readall(f::IO, T)
   x = Vector{T}()
   while !eof(f)
@@ -917,6 +1004,7 @@ function readall(f::IO, T)
   end
   x
 end
+
 function readall(fn::AbstractString, T)
   x = Vector{T}()
   open(fn, "r") do f
@@ -928,9 +1016,9 @@ end
 export centralize, centralize!
 "transform x to (-1, 1)"
 function centralize!(x, dim=1)
-  _max = maximum(x, dim)
-  _min = minimum(x, dim)
-  x .= (x .- _min) ./ (_max .- _min)
+  𝑚ax = maximum(x, dim)
+  𝑚in = minimum(x, dim)
+  x .= (x .- 𝑚in) ./ (𝑚ax .- 𝑚in)
   x .= 2 .* x .- 1
 end
 centralize(x, dim = 1) = centralize!(deepcopy(x), dim)
@@ -969,7 +1057,7 @@ Base.Int32(x::Union{Float64, Float32}) = round(Int32, x)
 # Parameter
 ###############################################################################
 export Parameter
-abstract Parameter
+abstract type Parameter end
 
 export getparam
 getparam(param::Parameter) = fieldvalues(param)[1:(end - 1)]
@@ -998,6 +1086,7 @@ macro withkw(ex)
 end
 
 export @param
+
 macro param(ex)
   ex = macroexpand(ex)
   bounds = []
@@ -1007,11 +1096,20 @@ macro param(ex)
   for arg in args
     if arg.head != :line
       tmp = arg.args[2]
-      if isa(tmp, Expr) && tmp.head == :(=>)
-        push!(bounds, tmp.args[2])
-        arg.args[2] = tmp.args[1]
+      if VERSION <= v"0.5.2"
+        if isa(tmp, Expr) && tmp.head == :(=>)
+          push!(bounds, tmp.args[2])
+          arg.args[2] = tmp.args[1]
+        else
+          push!(bounds, tmp)
+        end
       else
-        push!(bounds, tmp)
+        if isa(tmp, Expr) && tmp.args[1] == :(=>)
+          push!(bounds, tmp.args[3])
+          arg.args[2] = tmp.args[2]
+        else
+          push!(bounds, tmp)
+        end
       end
     end
   end
@@ -1034,9 +1132,9 @@ function unroll_block!(ex::Expr)
   i = 1
   while i <= length(args)
     if isa(args[i], Expr) && args[i].head == :block
-      _ = deepcopy(args[i].args)
+      tmp = deepcopy(args[i].args)
       deleteat!(args, i)
-      insert!(args, i, _)
+      insert!(args, i, tmp)
       i -= 1
     else
       unroll_block!(args[i])
@@ -1092,11 +1190,14 @@ function transfer_system(ip, user, port)
 end
 
 ustc() = transfer_system("172.16.1.17", "luyao", 22)
+
 highchain() = transfer_system("101.231.45.146", "luyao", 8822)
 
 export linux_path, cygdrive
+
 linux_path(path) = replace(path, "\\", "/")
-cygdrive(path) = @> path linux_path replace(":", "") _->"/cygdrive/$_"
+
+cygdrive(path) = @> path linux_path replace(":", "") x->"/cygdrive/$x"
 
 function junocloud(ip, user, port)
   local_root = joinpath(homedir(), "Documents", "Codes") |> linux_path
@@ -1180,7 +1281,7 @@ end
 
 function fit(encoder::LabelEncoder, label)
   encoder.unique_label = unique(label)
-  (eltype(encoder.unique_label) <: Number) && sort!(encoder.unique_label)
+  sort!(encoder.unique_label)
 end
 
 function transform(encoder::LabelEncoder, label)
@@ -1215,7 +1316,7 @@ end
 
 function fit(encoder::OneHotEncoder, label)
   encoder.unique_label = unique(label)
-  (eltype(encoder.unique_label) <: Number) && sort!(encoder.unique_label)
+  sort!(encoder.unique_label)
 end
 
 function transform(encoder::OneHotEncoder, label)
@@ -1251,8 +1352,8 @@ export MinMaxScaler, fit_transform, fit, transform, inverse_transform
 """
 @with_kw type MinMaxScaler
   sample_dim::Int = 2
-  _max::Array{Float32} = []
-  _min::Array{Float32} = []
+  𝑚ax::Array{Float32} = []
+  𝑚in::Array{Float32} = []
 end
 
 function fit_transform(scaler::MinMaxScaler, x, shape = (); dim = 2, reshape = false)
@@ -1261,13 +1362,13 @@ function fit_transform(scaler::MinMaxScaler, x, shape = (); dim = 2, reshape = f
 end
 
 function fit(scaler::MinMaxScaler, x, shape = (); dim = 2, reshape = false)
-  scaler.sample_dim, scaler._max, scaler._min = dim, maximum(x, 2), minimum(x, 2)
+  scaler.sample_dim, scaler.𝑚ax, scaler.𝑚in = dim, maximum(x, 2), minimum(x, 2)
   return scaler
 end
 
-transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .- scaler._min) ./ (scaler._max .- scaler._min .+ 1.0f-20) .- 0.5f0
+transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .- scaler.𝑚in) ./ (scaler.𝑚ax .- scaler.𝑚in .+ 1.0f-20) .- 0.5f0
 
-inverse_transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .+ 0.5f0) .* (scaler._max .- scaler._min + 1.0f-20) .+ scaler._min
+inverse_transform(scaler::MinMaxScaler, x, shape = (); reshape = false) = (Array{Float32}(x) .+ 0.5f0) .* (scaler.𝑚ax .- scaler.𝑚in + 1.0f-20) .+ scaler.𝑚in
 
 ###############################################################################
 # end of MinMaxScaler
@@ -1327,7 +1428,7 @@ export ImageScaler, fit_transform, fit, transform, inverse_transform
     transform(scaler, x)
 """
 @with_kw type ImageScaler
-  _max::Float32 = 1
+  𝑚ax::Float32 = 1
   shape::NTuple = ()
 end
 
@@ -1336,10 +1437,10 @@ function fit_transform(scaler::ImageScaler, x, shape; reshape = false)
   transform(scaler, x; reshape = reshape)
 end
 
-fit(scaler::ImageScaler, x, shape) = (scaler.shape = shape; scaler._max = maximum(abs, x))
+fit(scaler::ImageScaler, x, shape) = (scaler.shape = shape; scaler.𝑚ax = maximum(abs, x))
 
 function transform(scaler::ImageScaler, x; reshape = false)
-  xs = Array{Float32}(x) / scaler._max
+  xs = Array{Float32}(x) / scaler.𝑚ax
   reshape ? Base.reshape(xs, (scaler.shape..., ccount(xs))) : xs
 end
 ###############################################################################
@@ -1347,7 +1448,7 @@ end
 ###############################################################################
 
 export softmax, hardmax
-softmax(x, dim = 1) = (y = exp(x); y ./ sum(y, dim))
+softmax(x, dim = 1) = (y = exp.(x); y ./ sum(y, dim))
 hardmax(x, dim = 1) = x .== maximum(x, dim)
 
 macro curry(n, f)
@@ -1611,11 +1712,10 @@ end
 aria2c(url; o...) = aria2c(url, tempname(); o...)
 
 export psdownload
-function psdownload(url, to)
-	run(`powershell (new-object system.net.webClient).downloadFile(\"$url\", \"$to\")`)
+function psdownload(url, to = tempname())
+	run("powershell (new-object system.net.webClient).downloadFile(\"$url\", \"$to\")")
 	return to
 end
-psdownload(url) = psdownload(url, tempname())
 
 export rsync
 function rsync(src::String, dst::String, port = 22; zip = true, delete = true, exclude = false, update = false)
@@ -1647,7 +1747,6 @@ function rsync(src::String, dsts::Array{String}, port = 22; kwargs...)
   end
 end
 
-
 macro plots()
 	ex = :(import Plots)
 	if isdefined(:IJulia)
@@ -1658,21 +1757,7 @@ macro plots()
 	esc(ex)
 end
 
-function require()
-	ENV["PYTHON"] = "C:/PortableSoftware/Scoop/apps/python/3.6.0/python.exe"
-	ENV["JUPYTER"] = "C:/PortableSoftware/Scoop/apps/python/3.6.0/Scripts/jupyter-notebook.exe"
-
-	pkgs = ["WinRPM"]
-	urls = ["https://github.com/AStupidBear/WinRPM.jl.git"]
-	for (pkg, url) in zip(pkgs, urls)
-		Pkg.installed(pkg) == nothing && (Pkg.clone(url);Pkg.build(pkg))
-	end
-
-	pkgs = ["GR", "Plots", "Gtk", "PyCall", "IJulia", "BenchmarkTools"]
-	for pkg in pkgs
-		Pkg.installed(pkg) == nothing && Pkg.add(pkg)
-	end
-end
+Base.run(str::AbstractString) = @static is_windows() ? ps(str) : bash(str)
 
 export @bat_str
 macro bat_str(str, exe = "run")

@@ -52,3 +52,10 @@ si = [STARTUPINFO()]
 	convert(Ptr{PROCESS_INFORMATION}, pointer(pi)),
 	convert(Ptr{STARTUPINFO}, pointer(pi)))
 end
+
+using Utils
+bsub(queue = "smallopa", n = 122, fn = "opt1")
+bsub(queue = "longopa", subqueue = "smallopa", n = 199, fn = "opt2")
+bsub(queue = "longopa", subqueue = "smallopa", n = 276, fn = "opt3")
+bsub(queue = "fat144", n = 276, fn = "opt3")
+exit()
