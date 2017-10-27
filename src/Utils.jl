@@ -961,28 +961,28 @@ export balance
     hist1(yb, -1.5:1.5)
 """
 function balance(x, y; featuredim = "col", sampleratio = 1.0)
-	if featuredim == "col"
-		getfun, setfun, countfun = cview, cset!, ccount
-	elseif featuredim == "row"
-		getfun, setfun, countfun = rview, rset!, rcount
-	end
+    if featuredim == "col"
+        getfun, setfun, countfun = cview, cset!, ccount
+    elseif featuredim == "row"
+        getfun, setfun, countfun = rview, rset!, rcount
+    end
 
-  d = Dict()
-  for i in 1:ccount(x)
-    get!(d, y[i], [getfun(x, i)])
-    push!(d[y[i]], getfun(x, i))
-  end
+    d = Dict()
+    for i in 1:ccount(x)
+        get!(d, y[i], [getfun(x, i)])
+        push!(d[y[i]], getfun(x, i))
+    end
 
-  nb = Int(countfun(x) * sampleratio); yb = zeros(nb)
-  xb = featuredim == "col" ? zeros(size(x, 1), nb) : zeros(nb, size(x, 2))
+    nb = Int(countfun(x) * sampleratio); yb = zeros(nb)
+    xb = featuredim == "col" ? tuple([zeros(size(z, 1), nb) for z in x]...) : tuple([zeros(nb, size(z, 2)) for z in x]...)
 
-  ny, key, vals = length(d), collect(keys(d)), collect(values(d))
-  for i in 1:nb
-    r = rand(1:ny)
-    setfun(yb, key[r], i)
-    setfun(xb, rand(vals[r]), i)
-  end
-  return xb, yb
+    ny, key, vals = length(d), collect(keys(d)), collect(values(d))
+    for i in 1:nb
+        r = rand(1:ny)
+        setfun(yb, key[r], i)
+        setfun(xb, rand(vals[r]), i)
+    end
+    return xb, yb
 end
 
 
@@ -996,6 +996,8 @@ function hasnan(x)
   end
   false
 end
+
+export readall
 
 function readall(f::IO, T)
   x = Vector{T}()
