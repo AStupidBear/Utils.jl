@@ -1038,7 +1038,7 @@ timename(fn) = joinpath(tempdir(), minute() * "_" * fn)
 export histn
 "c, w = histn(rand(10), rand(10), rand(10))"
 function histn(xs::Array...; o...)
-	h = StatsBase.fit(StatsBase.Histogram, vec.(xs); o...)
+	h = StatsBase.fit(StatsBase.Histogram, vec.(xs); closed = :left, o...)
 	edge2center.(h.edges), h.weights
 end
 
