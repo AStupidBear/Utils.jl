@@ -1734,21 +1734,21 @@ function rsync(src::String, dst::String, port = 22; passwd = "", opts = `-avPh`)
 end
 
 export parsync
-parsync(src, dst, args...; kwargs...) = rsync(readabsdir(src), dst, args...; kwargs...)
+parsync(src, dst, args...; excludes = [], kwargs...) = rsync(symdiff(readabsdir(src), excludes), dst, args...; kwargs...)
 
-function rsync(srcs::Array{String}, dsts::Array{String}, port = 22; kwargs...)
+function rsync(srcs::Array, dsts::Array, port = 22; kwargs...)
     pmap(srcs, dsts) do src, dst
         rsync(src, dst, port; kwargs...)
     end
 end
 
-function rsync(srcs::Array{String}, dst::String, port = 22; kwargs...)
+function rsync(srcs::Array, dst::String, port = 22; kwargs...)
     pmap(srcs) do src
         rsync(src, dst, port; kwargs...)
     end
 end
 
-function rsync(src::String, dsts::Array{String}, port = 22; kwargs...)
+function rsync(src::String, dsts::Array, port = 22; kwargs...)
     pmap(dsts) do dst
         rsync(src, dst, port; kwargs...)
     end
