@@ -40,6 +40,52 @@ using MLKernels
 ###############################################################################
 
 ###############################################################################
+# begin of conv
+###############################################################################
+using Base.Cartesian
+
+export convn!, convn
+
+convsize(w, x) = size(x) .- size(w) .+ 1
+
+@generated function convn!(y::AbstractArray{T}, w::AbstractArray{T, N}, x::AbstractArray{T, N}) where {T, N}
+    quote
+        @inbounds begin
+            @nloops $N j w begin
+                @nloops $N k y begin
+                    @nextract $N i d -> k_d + j_d - 1
+                    (@nref $N y k) += (@nref $N x i) * (@nref $N w j)
+                end
+            end
+        end
+        return y
+    end
+end
+
+@generated function convn(w::AbstractArray{T, N}, x::AbstractArray{T, N}) where {T, N}
+    quote
+        ysize = convsize(w, x)
+        y = zeros(ysize)
+        convn!(y, w, x)
+        return y
+    end
+end
+
+function conv4(w::AbstractArray{T, N}, x::AbstractArray{T, N}) where {T, N}
+    W1, W2, I, O = size(w)
+    X1, X2, I, N = size(x)
+    y = zeros(T, (X1 - W1 + 1, X2 - W2 + 1, O, N))
+    @inbounds for j in 1:N, i in 1:O
+        convn!(view(y, :, :, i:i, j), view(w, :, :, :, i), view(x, :, :, :, j))
+    end
+    return y
+end
+
+###############################################################################
+# end of conv
+###############################################################################
+
+###############################################################################
 # begin of kernel
 ###############################################################################
 export Nystroem, fit, transform
@@ -127,7 +173,6 @@ function scc_setup()
     if Sys.CPU_CORES > 8 && !contains(readstring(`hostname`), "highchain")
         @eval begin
             using MPI
-            MPI.Init()
             mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
         end
     end
@@ -135,8 +180,7 @@ end
 
 export scc_end
 function scc_end()
-    isdefined(Main, :MPI) && @everywhere (MPI.Finalize(); exit())
-    exit()
+    @eval isdefined(Main, :MPI) && MPI.stop_main_loop(mngr)
 end
 
 
@@ -336,6 +380,15 @@ macro undict(d, exs...)
         push!(blk.args, :($ex = haskey($d, $exquot) ? $d[$exquot] : $d[$exstr]))
     end
     esc(blk)
+end
+
+export @setdict
+macro setdict(d, keys...)
+    ex = Expr(:block)
+    for s in keys
+        push!(ex.args, :($d[$(string(s))] = $s))
+    end
+    return esc(ex)
 end
 
 ###############################################################################
@@ -1028,15 +1081,15 @@ function centralize!(x, dim=1)
 end
 centralize(x, dim = 1) = centralize!(deepcopy(x), dim)
 
-export minute
-minute() = @> string(now())[1:16] replace(":", "-")
-
-export date
-date() = string(now())[1:10]
+export date, hour, minute, second, msecond
+date() = Dates.format(now(), "yyyy-mm-dd")
+hour() = Dates.format(now(), "yyyy-mm-dd_HH")
+minute() = Dates.format(now(), "yyyy-mm-dd_HH-MM")
+second() = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
+msecond() = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS-s")
 
 export timename
-timename(fn) = joinpath(tempdir(), minute() * "_" * fn)
-
+timename(fn) = joinpath(tempdir(), fn * "_" * Dates.format(now(), "yyyy-mm-dd_HH-MM-SS-s"))
 
 export histn
 "c, w = histn(rand(10), rand(10), rand(10); nbins = 10)"
@@ -2499,5 +2552,68 @@ end
 #   end
 # end
 
+# @eval Knet begin
+#     function conv4{T}(w::Array{T,4}, x::Array{T,4};
+#         padding = 0, stride = 1, upscale = 1, mode = 0, alpha = 1,
+#         o...) # Ignoring handle, algo, workSpace, workSpaceSizeInBytes
+#         if upscale != 1; throw(ArgumentError("CPU conv4 only supports upscale=1.")); end
+#         if mode != 0 && mode != 1; throw(ArgumentError("conv4 only supports mode=0 or 1.")); end
+#         Wx, Hx, Cx, Nx = size(x)
+#         Ww, Hw, C1, C2 = size(w)
+#         if Cx != C1; throw(DimensionMismatch()); end
+#         Wy, Hy, Cy, Ny = cdims(w, x; padding = padding, stride = stride)
+#         y = similar(x, (Cy, Wy * Hy * Ny))
+#         xcol = similar(x, (Wy * Hy * Ny, Ww * Hw * C1))
+#         x2 = similar(x, (Wy * Hy, Ww * Hw * C1))
+#         (p1, p2) = psize(padding, x)
+#         (s1, s2) = psize(stride, x)
+#         alpha, beta = T(alpha), T(0)
+#         @inbounds for n in 1:Nx
+#             # im2col!(w, x, x2, n, p1, p2, s1, s2, mode)
+#             im2col!(x, n, x2, Wx, Hx, Cx, (Ww, Hy), (p1, p2), (s1, s2))
+#             ind = (n - 1) * Wy * Hy + 1 : n * Wy * Hy
+#             xcol[ind, :] = x2
+#         end
+#         gemm!('T','T', alpha, reshape(w, Ww * Hw * Cx, :), xcol, beta, y)
+#         y = permutedims(reshape(y, Cy, Wy, Hy, Ny), [2, 3, 1, 4])
+#         return y
+#     end
+#
+#     function im2col!{T}(img::Array{T}, n::Int, col::Array{T}, width::Int, height::Int, channels::Int,
+#         kernel::NTuple{2,Int}, pad::NTuple{2,Int}, stride::NTuple{2,Int})
+#
+#         im2col_impl!(view(img,:,:,:,n), col, width, height, channels, kernel, pad, stride)
+#     end
+#
+#     function im2col_impl!{T}(img::AbstractArray{T}, col::Array{T}, width::Int, height::Int, channels::Int,
+#         kernel::NTuple{2,Int}, pad::NTuple{2,Int}, stride::NTuple{2,Int})
+#
+#         kernel_w, kernel_h = kernel
+#         pad_w, pad_h = pad
+#         stride_w, stride_h = stride
+#
+#         height_col = div(height + 2pad_h - kernel_h, stride_h) + 1
+#         width_col = div(width + 2pad_w - kernel_w, stride_w) + 1
+#         channels_col = channels * kernel_h * kernel_w
+#
+#         for c = 0:channels_col-1
+#             w_offset = c % kernel_w
+#             h_offset = div(c, kernel_w) % kernel_h
+#             c_im = div(c, kernel_h * kernel_w) # channel
+#             for h = 0:height_col-1
+#                 for w = 0:width_col-1
+#                     h_pad = h*stride_h - pad_h + h_offset
+#                     w_pad = w*stride_w - pad_w + w_offset
+#                     if (h_pad >= 0 && h_pad < height && w_pad >= 0 && w_pad < width)
+#                         @inbounds col[1 + (c*height_col+h) * width_col + w] =
+#                         img[1 + (c_im * height + h_pad) * width + w_pad]
+#                     else
+#                         @inbounds col[1 + (c*height_col+h) * width_col + w] = 0
+#                     end
+#                 end
+#             end
+#         end
+#     end
+# end
 
 end # End of Utils
