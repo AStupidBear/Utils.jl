@@ -14,39 +14,13 @@ macro info(ex)
     :($x = $ex; info($x); $x) |> esc
 end
 
-using Lazy: isexpr, rmlines, splitswitch
-export @switch
-macro switch(args...)
-    test, exprs = splitswitch(args...)
-
-    length(exprs) == 0 && return nothing
-    length(exprs) == 1 && return esc(exprs[1])
-
-    test_expr(test, val) =
-    test == :_      ? val :
-    has_symbol(test, :_) ? :(let _ = $val; $test; end) :
-    :($test==$val)
-
-    thread(val, yes, no) = :($(test_expr(test, val)) ? $yes : $no)
-    thread(val, yes) = thread(val, yes, :(error($"No match for $test in @switch")))
-    thread(val, yes, rest...) = thread(val, yes, thread(rest...))
-
-    esc(thread(exprs...))
-end
-
 export @repeat
 macro repeat(n, ex)
     Expr(:block, (ex for i in 1:n)...) |> esc
 end
 
 export @DataFrame
-macro DataFrame(exs...)
-    x = Expr(:call, :DataFrame)
-    for ex in exs
-        push!(x.args, Expr(:kw, ex, ex))
-    end
-    esc(x)
-end
+macro DataFrame(exs...) Expr(:call, :DataFrame, Expr.(:kw, exs, exs)...) end
 
 export @unstruct
 macro unstruct(typ)
@@ -176,3 +150,23 @@ macro trys(exs...)
     end
     esc(expr)
 end
+
+# using Lazy: isexpr, rmlines, splitswitch
+# export @switch
+# macro switch(args...)
+#     test, exprs = splitswitch(args...)
+#
+#     length(exprs) == 0 && return nothing
+#     length(exprs) == 1 && return esc(exprs[1])
+#
+#     test_expr(test, val) =
+#     test == :_      ? val :
+#     has_symbol(test, :_) ? :(let _ = $val; $test; end) :
+#     :($test==$val)
+#
+#     thread(val, yes, no) = :($(test_expr(test, val)) ? $yes : $no)
+#     thread(val, yes) = thread(val, yes, :(error($"No match for $test in @switch")))
+#     thread(val, yes, rest...) = thread(val, yes, thread(rest...))
+#
+#     esc(thread(exprs...))
+# end
