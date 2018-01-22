@@ -67,4 +67,4 @@ function bash(str, exe = run)
 end
 
 export code2cmd
-code2cmd(str) = @> str replace("\n","") replace("\"", "\\\"")
+code2cmd(str) = replace(replace(str, "\n",""), "\"", "\\\"")

@@ -1,6 +1,6 @@
 export LabelEncoder, OneHotEncoder, fit_transform, fit, transform, inverse_transform
 
-@with_kw type LabelEncoder
+@with_kw mutable struct LabelEncoder
     unique_label::Array = []
 end
 
@@ -24,6 +24,18 @@ function inverse_transform(encoder::LabelEncoder, index)
     [encoder.unique_label[Int(i + 1)] for i in index]
 end
 
+export confusmat
+function confusmat(ul, y, ypred)
+    encoder = LabelEncoder(ul)
+    ypred_int = transform(encoder, ypred) + 1
+    y_int = transform(encoder, y) + 1
+    R = Int[countnz((y_int .== i) .& (ypred_int .== j)) for i in 1:length(ul), j in 1:length(ul)]
+    mat = Any["gt/pred" ul'; Any[ul R]]
+end
+
+export mat2acc
+mat2acc(mat) = sum(diag(mat)) / sum(mat)
+
 """
 ```
 label = [1, 3, 2]' #["small", "medium", "large"]'
@@ -32,7 +44,7 @@ vector = fit_transform(encoder, label)
 inverse_transform(encoder, vector) == label
 ```
 """
-@with_kw type OneHotEncoder
+@with_kw mutable struct OneHotEncoder
     unique_label::Array = []
 end
 

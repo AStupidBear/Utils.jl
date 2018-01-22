@@ -114,23 +114,3 @@ function undersample(xs::Array...; nsample = 2, featuredim = "col")
     cols = rand(1:countfun(xs[1]), nsample)
     [getfun(x, cols) for x in xs]
 end
-
-export smooth
-function smooth(x, n, dim::Integer = 1)
-    s = similar(x)
-    Rpre = CartesianRange(size(x)[1:dim-1])
-    Rpost = CartesianRange(size(x)[dim+1:end])
-    _smooth!(s, x, n, Rpre, size(x, dim), Rpost)
-end
-
-@noinline function _smooth!(s, x, n, Rpre, N, Rpost)
-    for Ipost in Rpost
-        for i = 1:N
-            ind = max(1, i-n):min(N, i+n)
-            for Ipre in Rpre
-                s[Ipre, i, Ipost] = sum(x[Ipre, i, Ipost] for i in ind) / length(ind)
-            end
-        end
-    end
-    s
-end

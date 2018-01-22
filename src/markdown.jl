@@ -1,3 +1,5 @@
+using Glob
+
 function paper(fn)
     download("https://raw.githubusercontent.com/ihrke/markdown-paper/master/templates/elsarticle-template-1-num.latex", "elsarticle-template-1-num.latex")
     run(`pandoc $fn.md
@@ -36,10 +38,10 @@ function thesis(fn, fmt = "pdf"; title = "This is the title of the thesis", name
     elseif fmt == "html"
         download("$STYLEPATH/template.html", "template.html")
         download("$STYLEPATH/style.css", "style.css")
-        @>(readstring("template.html"),
-        replace("This is the title of the thesis", title),
-        replace("Firstname Surname", name)) |>
-        x -> write("template.html", x)
+        content = readstring("template.html")
+        content = replace(content, "This is the title of the thesis", title),
+        content = replace(content, "Firstname Surname", name))
+        write("template.html", content)
         run(`pandoc $(glob("*.md"))
         -o $fn.html
         --standalone

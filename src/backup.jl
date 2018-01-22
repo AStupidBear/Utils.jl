@@ -2,8 +2,7 @@ function rename_borg_youtube()
     for (root, dirs, files) in walkdir(pwd())
         for file in files
             fn = joinpath(root, file)
-            fn_new = @>(fn, replace(r" \(.*\)", ""),
-            replace("%3", " "), replace("_hd", ""))
+            fn_new = replace(replace(replace(fn, r" \(.*\)", ""), "%3", " "), "_hd", "")
             try mv(fn, fn_new) end
         end
     end

@@ -1,3 +1,5 @@
+using TypedTables
+
 import TypedTables: @Table, @Row
 
 macro Table(exprs...)

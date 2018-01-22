@@ -20,7 +20,7 @@ end
 
 function img2mat(A)
     @eval using Images
-    @> A channelview permutedims((2, 3, 1))
+    permutedims(channelview(A), (2, 3, 1))
 end
 
 vec2rgb(x) = (W = Int(√(length(x) ÷ 3)); reshape(x, W, W, 3))

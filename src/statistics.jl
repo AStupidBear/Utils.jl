@@ -1,15 +1,3 @@
-export confusmat
-function confusmat(ul, y, ypred)
-    encoder = LabelEncoder(ul)
-    ypred_int = transform(encoder, ypred) + 1
-    y_int = transform(encoder, y) + 1
-    R = Int[countnz((y_int .== i) .& (ypred_int .== j)) for i in 1:len(ul), j in 1:len(ul)]
-    mat = Any["gt/pred" ul'; Any[ul R]]
-end
-
-export mat2acc
-mat2acc(mat) = sum(diag(mat)) / sum(mat)
-
 export histn
 "c, w = histn(rand(10), rand(10), rand(10); nbins = 10)"
 function histn(xs::Array...; o...)
@@ -58,8 +46,8 @@ xcov(A,B) = xcorr(A .- mean(A), B .- mean(B))
 #     ε = 1e-100
 #     low, up = extrema((extrema(x1)..., extrema(x2)...))
 #     edge = linspace(low, up, 1000)
-#     P1 = @as _ x1 fit(Histogram, vec(_), edge) _ ./ sum(_)
-#     P2 = @as _ x2 fit(Histogram, vec(_), edge) _ ./ sum(_)
+#     P1 = normalize(fit(Histogram, vec(x1), edge), 1)
+#     P2 = normalize(fit(Histogram, vec(x2), edge), 1)
 #     KL = sum(P1 .* log.(2, P1 ./ (P2 .+ ε) .+ ε))
 # end
 

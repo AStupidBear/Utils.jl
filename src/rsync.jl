@@ -35,7 +35,7 @@ export linux_path, cygdrive
 
 linux_path(path) = replace(path, "\\", "/")
 
-cygdrive(path) = @> path linux_path replace(":", "") x->"/cygdrive/$x"
+cygdrive(path) = joinpath("/cygdrive/", replace(linux_path(path), ":", ""))
 
 # function junocloud(ip, user, port)
 #     local_root = joinpath(homedir(), "Documents", "Codes") |> linux_path

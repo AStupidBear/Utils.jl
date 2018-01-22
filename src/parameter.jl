@@ -17,7 +17,7 @@ end
 macro rep(n, ex)
     name = ex.args[1].args[1] |> string
     exs = [exreplace(ex, Symbol(name), Symbol(name*"$i")) for i in 1:n]
-    @as _ exs Expr(:block, _...) esc
+    esc(Expr(:block, exs...))
 end
 
 macro withkw(ex)

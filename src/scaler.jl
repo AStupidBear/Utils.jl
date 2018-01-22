@@ -8,7 +8,7 @@ y = fit_transform(scaler, x)
 inverse_transform(scaler, y) == x
 ```
 """
-@with_kw type MinMaxScaler
+@with_kw mutable struct MinMaxScaler
     sample_dim::Int = 2
     𝑚ax::Array{Float32} = []
     𝑚in::Array{Float32} = []
@@ -39,7 +39,7 @@ transform(scaler, x)
 ```
 """
 
-@with_kw type ShapeScaler
+@with_kw mutable struct ShapeScaler
     scalers::Vector{MinMaxScaler} = Vector{MinMaxScaler}()
     shapes::Tuple = ()
 end
@@ -72,7 +72,7 @@ fit(scaler, x, (2, 2))
 transform(scaler, x)
 ```
 """
-@with_kw type ImageScaler
+@with_kw mutable struct ImageScaler
     𝑚ax::Float32 = 1
     shape::NTuple = ()
 end
