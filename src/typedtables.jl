@@ -1,4 +1,4 @@
-using TypedTables
+using TypedTables, DataFrames
 
 import TypedTables: @Table, @Row
 
