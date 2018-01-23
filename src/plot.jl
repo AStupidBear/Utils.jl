@@ -17,12 +17,12 @@ macro plots()
     esc(ex)
 end
 
-function labelplot(y, label)
+function labelplot(y, label, colormap = Dict(-1 => :green, 0 => :black, 1 => :red))
     p = Main.plot(;legend = nothing)
     told = 1
     for t in 2:length(y)
         if label[t] != label[t-1] || t == length(y)
-            Main.plot!(p, told:t, y[told:t]; color = Int(label[t-1]), label = label[t-1])
+            Main.plot!(p, told:t, y[told:t]; color = get(colormap, Int(label[t-1]), Int(label[t-1])), label = label[t-1])
             told = t
         end
     end
