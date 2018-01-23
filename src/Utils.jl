@@ -27,6 +27,10 @@ include("sys.jl")
 include("time.jl")
 include("traits.jl")
 
+include("encoder.jl")
+include("scaler.jl")
+include("data.jl")
+
 export loadutil
 loadutil(name) = include(joinpath(@__DIR__, name * ".jl"))
 
