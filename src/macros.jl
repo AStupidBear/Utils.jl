@@ -20,7 +20,7 @@ macro repeat(n, ex)
 end
 
 export @DataFrame
-macro DataFrame(exs...) Expr(:call, :DataFrame, Expr.(:kw, exs, exs)...) end
+macro DataFrame(exs...) esc(Expr(:call, :DataFrame, Expr(:parameters, Expr.(:call, :(=>), QuoteNode.(exs), exs)...))) end
 
 export @unstruct
 macro unstruct(typ)
@@ -35,7 +35,7 @@ macro unstruct(typ, exs...)
     blk = Expr(:block)
     for ex in exs
         exquot = QuoteNode(ex)
-        push!(blk.args, :($ex =getfield($typ, $exquot)))
+        push!(blk.args, :($ex = getfield($typ, $exquot)))
     end
     esc(blk)
 end
@@ -75,7 +75,7 @@ undict(d)
 """
 function undict(d)
     for (key, val) in d
-        eval(current_module(),:($(key)=$val))
+        eval(current_module(), :($(key) = $val))
     end
 end
 
@@ -125,19 +125,19 @@ macro ignore(ex)
 end
 
 export @catch
-    macro catch(ex)
-        :(try $ex; catch e; warn(e); return; end) |> esc
-    end
+macro catch(ex)
+    :(try $ex; catch e; warn(e); return; end) |> esc
+end
 
-    export @correct
-    macro correct(ex)
-        res = gensym()
-        :($res = try $ex end; $res == nothing ? false : $res) |> esc
-    end
+export @correct
+macro correct(ex)
+    res = gensym()
+    :($res = try $ex end; $res == nothing ? false : $res) |> esc
+end
 
-    export ntry
-    macro ntry(ex, n = 1000)
-        :(for t in 1:$n
+export ntry
+macro ntry(ex, n = 1000)
+    :(for t in 1:$n
         try $ex; break; catch e; warn(e);	end
     end) |> esc
 end
