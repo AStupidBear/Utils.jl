@@ -7,6 +7,16 @@ getparam(param::Parameter) = fieldvalues(param)[1:(end - 1)]
 
 catparam{T<:Parameter}(param::T, c) = T(c..., param.bounds)
 
+function setparam!(param::Parameter, name, x)
+    setfield!(param, name, x)
+    i = findfirst(x -> x == name, fieldnames(param))
+    bounds = param.bounds
+    if length(bounds[i]) <= 1 || (bounds[i] <: AbstractString)
+        param.bounds = (bounds[1:i-1]..., x, bounds[i+1:end]...)
+    end
+    return param
+end
+
 function Base.display(param::Parameter)
     println("Parameters: ")
     for s in fieldnames(param)
