@@ -1,4 +1,4 @@
-export Parameter, getparam, catparam, delete_line!, unroll, unroll_block!
+export Parameter, getparam, catparam, setparam!, delete_line!, unroll, unroll_block!
 export @rep, @param, @withkw
 
 abstract type Parameter end
