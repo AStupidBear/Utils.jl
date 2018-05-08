@@ -69,9 +69,9 @@ ccount(x::Tuple) = ccount(x[1])
 rcount(x::Tuple) = rcount(x[1])
 
 export rows, columns, eachslice
-rows(x) = julienne(x, (*, :))
-columns(x) = julienne(x, (:, *))
-eachslice(x, d) = julienne(x, ntuple(i -> i == d ? (*) : Colon() , ndims(x)))
+rows(x) = julienne(Views, x, (*, :))
+columns(x) = julienne(Views, x, (:, *))
+eachslice(x, d) = julienne(Views, x, ntuple(i -> i == d ? (*) : Colon() , ndims(x)))
 
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
