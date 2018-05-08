@@ -8,4 +8,6 @@ using Reexport
 
 @reexport using DataStructures
 
+@reexport using JuliennedArrays
+
 import StatsBase

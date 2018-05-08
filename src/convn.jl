@@ -21,7 +21,7 @@ end
 @generated function convn(w::AbstractArray{T, N}, x::AbstractArray{T, N}) where {T, N}
     quote
         ysize = convsize(w, x)
-        y = zeros(ysize)
+        y = zeros(T, ysize)
         convn!(y, w, x)
         return y
     end

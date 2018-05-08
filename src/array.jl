@@ -68,6 +68,11 @@ Base.ctranspose(x::Tuple) = ctranspose.(x)
 ccount(x::Tuple) = ccount(x[1])
 rcount(x::Tuple) = rcount(x[1])
 
+export rows, columns, eachslice
+rows(x) = julienne(x, (*, :))
+columns(x) = julienne(x, (:, *))
+eachslice(x, d) = julienne(x, ntuple(i -> i == d ? (*) : Colon() , ndims(x)))
+
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
 #     for col in 1:length(colptr)-1
