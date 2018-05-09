@@ -78,3 +78,7 @@ cutoff{T}(x::T, xmin, xmax)::T =   x < xmin ? xmin : x > xmax ? xmax : x
 export softmax, hardmax
 softmax(x, dim = 1) = (y = exp.(x); y ./ sum(y, dim))
 hardmax(x, dim = 1) = x .== maximum(x, dim)
+
+Base.sum(f::Function, v0::Number, iter) = mapreduce(f, +, v0, iter)
+
+Base.maximum(f::Function, v0::Number, iter) = isempty(iter) ? v0 : maximum(f, iter)
