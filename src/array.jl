@@ -73,6 +73,11 @@ rows(x) = julienne(Views, x, (*, :))
 columns(x) = julienne(Views, x, (:, *))
 eachslice(x, d) = julienne(Views, x, ntuple(i -> i == d ? (*) : Colon() , ndims(x)))
 
+Base.start(x::Void) = 0
+Base.done(x::Void, n::Int64) = true
+Base.length(x::Void) = 0
+Base.step(x::AbstractArray) = mean(diff(x))
+
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
 #     for col in 1:length(colptr)-1
