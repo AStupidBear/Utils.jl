@@ -78,6 +78,9 @@ Base.done(x::Void, n::Int64) = true
 Base.length(x::Void) = 0
 Base.step(x::AbstractArray) = mean(diff(x))
 
+export unsqueeze
+unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim - 1]..., 1, size(xs)[dim:end]...))
+
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
 #     for col in 1:length(colptr)-1
