@@ -81,6 +81,7 @@ Base.step(x::AbstractArray) = mean(diff(x))
 export unsqueeze
 unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim - 1]..., 1, size(xs)[dim:end]...))
 
+Base.permutedims(x::AbstractArray) = permutedims(x, ndims(x):-1:1)
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
 #     for col in 1:length(colptr)-1
