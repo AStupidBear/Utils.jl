@@ -13,22 +13,8 @@ Base.vec(x::Number) = fill(x, 1)
 Base.vec(x::Symbol) = fill(x, 1)
 Base.vec(x::Expr) = x.args
 
-# """
-# ```julia
-# X = [([1,2,3],[4,5,6]), ([1,2,3], [4,5,6])]
-# vcat(X...)
-# ```
-# """
-for f in (:vcat, :hcat)
-    @eval begin
-        function Base.$f(X::Tuple...)
-            ntuple(length(X[1])) do j
-                $f([X[i][j] for i in 1:length(X)]...)
-                # mapreduce(i -> X[i][j], $f, 1:length(X))
-            end
-        end
-    end
-end
+Base.vcat(xs::Tuple...) = map(vcat, xs...)
+Base.hcat(xs::Tuple...) = map(hcat, xs...)
 
 export splat
 splat(list) = [item for sublist in list for item in sublist]
