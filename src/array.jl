@@ -54,9 +54,9 @@ Base.ctranspose(x::Tuple) = ctranspose.(x)
 ccount(x::Tuple) = ccount(x[1])
 rcount(x::Tuple) = rcount(x[1])
 
-export rows, columns, eachslice
-rows(x) = julienne(Views, x, (*, :))
-columns(x) = julienne(Views, x, (:, *))
+export eachrow, eachcol, eachslice
+eachrow(x) = julienne(Views, x, (*, :))
+eachcol(x) = julienne(Views, x, (:, *))
 eachslice(x, d) = julienne(Views, x, ntuple(i -> i == d ? (*) : Colon() , ndims(x)))
 
 Base.start(x::Void) = 0
