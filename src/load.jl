@@ -10,4 +10,6 @@ using Reexport
 
 @reexport using JuliennedArrays
 
+@reexport using FastClosures
+
 import StatsBase
