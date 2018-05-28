@@ -45,3 +45,15 @@ function Base.findmax(f::Function, x; parallel = false)
     yi, i = findmax(y)
     return x[i], y[i]
 end
+
+function Base.indmax(f::Function, x; parallel = false)
+    y = parallel ? pmap(f, x) : map(f, x)
+    yi, i = findmax(y)
+    return i
+end
+
+function Base.indmin(f::Function, x; parallel = false)
+    y = parallel ? pmap(f, x) : map(f, x)
+    yi, i = findmin(y)
+    return i
+end
