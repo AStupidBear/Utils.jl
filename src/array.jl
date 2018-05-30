@@ -19,27 +19,37 @@ Base.hcat(xs::Tuple...) = map(hcat, xs...)
 export splat
 splat(list) = [item for sublist in list for item in sublist]
 
-export csize, clength, ccount, cview, cget, cset!, size2
+export csize, rsize
 csize(a) = (ndims(a) == 1 ? size(a) : size(a)[1:end-1])
 csize(a, n) = tuple(csize(a)..., n) # size if you had n columns
+rsize(a) = (ndims(a) == 1 ? size(a) : size(a)[2:end])
+rsize(a, n) = tuple(n, rsize(a)...) # size if you had n columns
+
+export clength, rlength
 clength(a) = (ndims(a) == 1 ? 1 : stride(a, ndims(a)))
+rlength(a) = (ndims(a) == 1 ? length(a) : stride(a, ndims(a)))
+
+export ccount, rcount
 ccount(a) = (ndims(a) == 1 ? length(a) : size(a, ndims(a)))
-cview(a, i) = (ndims(a) == 1 ? view(a, i) : view(a, ntuple(i->(:), ndims(a) - 1)..., i))
-cget(a, i) = (ndims(a) == 1 ? a[i] : getindex(a, ntuple(i->(:), ndims(a)-1)..., i))
-cset!(a, x, i) = (ndims(a) == 1 ? (a[i] = x) : setindex!(a, x, ntuple(i->(:), ndims(a) - 1)..., i))
+rcount(a) = (ndims(a) == 1 ? length(a) : size(a, 1))
+
+export size2, size1
 size2(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (stride(y, nd), size(y, nd)))) # size as a matrix
 size2(y, i) = size2(y)[i]
-
-export rsize, rlength, rcount, rview, rget, rset!, size1
-rsize(a) = (ndims(a)==1 ? size(a) : size(a)[2:end])
-rsize(a, n) = tuple(n, rsize(a)...) # size if you had n columns
-rlength(a) = (ndims(a) == 1 ? length(a) : stride(a, ndims(a)))
-rcount(a) = (ndims(a) == 1 ? length(a) : size(a, 1))
-rview(a, i) = (ndims(a) == 1 ? view(a, i) : view(a, i, ntuple(i->(:), ndims(a) - 1)...))
-rget(a, i) = (ndims(a) == 1 ? a[i] : getindex(a, i, ntuple(i->(:), ndims(a)-1)...))
-rset!(a, x, i) = (ndims(a)==1 ? (a[i] = x) : setindex!(a, x, i, ntuple(i->(:), ndims(a)-1)...))
 size1(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (size(y, 1), prod(size(y)[2:end])))) # size as a matrix
 size1(y, i) = size1(y)[i]
+
+export cview, rview, cget, rget, cset!, rset!
+@generated function subslice(x::AbstractArray{T, N}) where {T, N}
+    inds = ntuple(i -> (:), N - 1)
+    :($inds)
+end
+cview(a, i) = view(a, subslice(a)..., i)
+rview(a, i) = view(a, i, subslice(a)...)
+cget(a, i) = getindex(a, subslice(a)..., i)
+rget(a, i) = getindex(a, i, subslice(a)...)
+cset!(a, x, i) = setindex!(a, x, subslice(a)..., i)
+rset!(a, x, i) = setindex!(a, x, i, subslice(a)...)
 
 for s in (:cget, :rget, :cview, :rview)
     @eval $s(as::Tuple, i) = tuple([$s(a, i) for a in as]...)
@@ -57,7 +67,10 @@ rcount(x::Tuple) = rcount(x[1])
 export eachrow, eachcol, eachslice
 eachrow(x) = julienne(Views, x, (*, :))
 eachcol(x) = julienne(Views, x, (:, *))
-eachslice(x, d) = julienne(Views, x, ntuple(i -> i == d ? (*) : Colon() , ndims(x)))
+@generated function eachslice(x::AbstractArray{T, N}, ::Type{Val{D}}) where {T, N, D}
+    t = ntuple(i -> i == D ? (*) : (:), N)
+    :(JuliennedArrays.julienne(JuliennedArrays.Views, x, $t))
+end
 
 Base.start(x::Void) = 0
 Base.done(x::Void, n::Int64) = true
