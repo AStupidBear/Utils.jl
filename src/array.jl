@@ -39,11 +39,13 @@ size2(y, i) = size2(y)[i]
 size1(y) = (nd = ndims(y); (nd == 1 ? (length(y), 1) : (size(y, 1), prod(size(y)[2:end])))) # size as a matrix
 size1(y, i) = size1(y)[i]
 
-export cview, rview, cget, rget, cset!, rset!
 @generated function subslice(x::AbstractArray{T, N}) where {T, N}
     inds = ntuple(i -> (:), N - 1)
     :($inds)
 end
+subslice(x) = ntuple(i -> (:), ndims(x) - 1)
+
+export cview, rview, cget, rget, cset!, rset!
 cview(a, i) = view(a, subslice(a)..., i)
 rview(a, i) = view(a, i, subslice(a)...)
 cget(a, i) = getindex(a, subslice(a)..., i)
