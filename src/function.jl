@@ -8,33 +8,13 @@ partial(f, a...; b...) = ((x...; y...) -> f(a..., x...; b..., y...))
 
 export throttle
 function throttle(f, timeout; leading = true, trailing = false)
-  cooldown = true
-  later = nothing
-  result = nothing
-
+  lasttime = time()
   function throttled(args...; kwargs...)
-    yield()
-
-    if cooldown
-      if leading
+    result = nothing
+    if time() > lasttime + timeout
         result = f(args...; kwargs...)
-      else
-        later = () -> f(args...; kwargs...)
-      end
-
-      cooldown = false
-      @schedule try
-        while (sleep(timeout); later != nothing)
-          later()
-          later = nothing
-        end
-      finally
-        cooldown = true
-      end
-    elseif trailing
-      later = () -> (result = f(args...; kwargs...))
+        lasttime = time()
     end
-
     return result
   end
 end
