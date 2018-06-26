@@ -18,6 +18,10 @@ function cron(fn, repeat)
     run(`task.bat`)
 end
 
+export parseenv
+parseenv(key, default) = parse(typeof(default), get(ENV, string(key), string(default)))
+parseenv(key, default::String) = get(ENV, string(key), string(default))
+
 # function proxy(url)
 #     regKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
 #     run(`powershell Set-ItemProperty -path \"$regKey\" AutoConfigURL -Value $url`)
