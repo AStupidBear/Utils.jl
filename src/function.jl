@@ -7,11 +7,12 @@ export partial
 partial(f, a...; b...) = ((x...; y...) -> f(a..., x...; b..., y...))
 
 export throttle
-function throttle(f, timeout; leading = true, trailing = false)
+function throttle(f, timeout; leading = true)
   lasttime = time()
+  leading && (lasttime -= timeout)
   function throttled(args...; kwargs...)
     result = nothing
-    if time() > lasttime + timeout
+    if time() >= lasttime + timeout
         result = f(args...; kwargs...)
         lasttime = time()
     end
