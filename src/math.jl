@@ -51,15 +51,6 @@ function ptp(x)
     xmax - xmin
 end
 
-export forwdiffn
-function forwdiffn(n, x, y = x)
-    dx = zeros(x)
-    for t in 1:(length(x) - n)
-        dx[t] = x[t + n] - y[t]
-    end
-    dx
-end
-
 export diffn
 function diffn(n, x, y = x)
     dx = zeros(x)
@@ -67,6 +58,29 @@ function diffn(n, x, y = x)
         dx[t] = x[t] - y[t-n]
     end
     dx
+end
+
+export change
+function change(x, T)
+    dx = zeros(x)
+    for t in linearindices(x)
+        t′ = clamp(t - T, 1, length(x))
+        t1, t2 = minmax(t, t′)
+        dx[t] = x[t2] - x[t1]
+    end
+    dx
+end
+
+export pctchange
+function pctchange(x, T)
+    ϵ = eps(eltype(x))
+    z = zeros(x)
+    for t in linearindices(x)
+        t′ = clamp(t - T, 1, length(x))
+        t1, t2 = minmax(t, t′)
+        z[t] = (x[t2] - x[t1]) / (x[t1] + ϵ)
+    end
+    return z
 end
 
 export cutoff
