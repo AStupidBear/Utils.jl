@@ -1,4 +1,4 @@
-export sortall
+export sortall, sortall!
 
 function sortall(xs::AbstractArray...; kw...)
     p = sortperm(first(xs); kw...)
