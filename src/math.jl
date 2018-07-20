@@ -96,3 +96,8 @@ hardmax(x, dim = 1) = x .== maximum(x, dim)
 Base.sum(f::Function, v0::Number, iter) = mapreduce(f, +, v0, iter)
 
 Base.maximum(f::Function, v0::Number, iter) = isempty(iter) ? v0 : maximum(f, iter)
+
+export ⧶
+⧶(x, y) = x / y
+⧶(x, y::AbstractFloat) = x / (y + eps(y))
+⧶(x, y::Integer) = ifelse(x == y == 0, zero(x), x / y)
