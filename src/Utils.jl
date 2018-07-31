@@ -27,6 +27,7 @@ include("sys.jl")
 include("time.jl")
 include("traits.jl")
 include("sort.jl")
+include("iterators.jl")
 
 include("encoder.jl")
 include("scaler.jl")
