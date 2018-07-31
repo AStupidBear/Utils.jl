@@ -101,3 +101,13 @@ export ⧶
 ⧶(x, y) = x / y
 ⧶(x, y::AbstractFloat) = x / (y + eps(y))
 ⧶(x, y::Integer) = ifelse(x == y == 0, zero(x), x / y)
+
+export allequal
+function allequal(x)
+    length(x) < 2 && return true
+    x1 = x[1]
+    @inbounds for xi in x
+        xi == x1 || return false
+    end
+    return true
+end
