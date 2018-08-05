@@ -103,11 +103,13 @@ export ⧶
 ⧶(x, y::Integer) = ifelse(x == y == 0, zero(x), x / y)
 
 export allequal
-function allequal(x)
+all(x) = all(identity, x)
+
+function allequal(f, x)
     length(x) < 2 && return true
-    x1 = x[1]
+    fx1 = f(x[1])
     @inbounds for xi in x
-        xi == x1 || return false
+        f(xi) == fx1 || return false
     end
     return true
 end
