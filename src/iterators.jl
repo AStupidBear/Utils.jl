@@ -11,6 +11,8 @@ function firstn(itr, n::Integer)
     return a
 end
 
+export firstn
 firstn(a::AbstractArray, n::Integer) = a[1:min(end, n)]
 
+export lastn
 lastn(a::AbstractArray, n::Integer) = a[max(1, end - n + 1):end]
