@@ -30,6 +30,15 @@ function Base.match(x, a::AbstractVector, b::AbstractVector)
     end
 end
 
+export pkill
+function pkill(name)
+    if is_windows()
+        try run(pipeline(`pgrep $name`, `xargs -n 1 kill`)) end
+    else
+        try run(`pkill -f -9 $name`) end
+    end
+end
+
 # function Base.edit(path::AbstractString, line::Integer=0)
 #     command = Base.editor()
 #     name = basename(first(command))
