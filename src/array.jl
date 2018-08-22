@@ -112,3 +112,7 @@ vechcat(xs) = veccat(2, xs)
 #         end
 #     end
 # end
+
+export zeroel, oneel
+zeroel(x) = zero(eltype(x))
+oneel(x) = one(eltype(x))
