@@ -124,8 +124,8 @@ macro ignore(ex)
     :(try $ex; catch e; warn(e); end) |> esc
 end
 
-export @catch
-macro catch(ex)
+export @catcherr
+macro catcherr(ex)
     :(try $ex; catch e; warn(e); return; end) |> esc
 end
 
@@ -138,7 +138,7 @@ end
 export ntry
 macro ntry(ex, n = 1000)
     :(for t in 1:$n
-        try $ex; break; catch e; warn(e);	end
+        try $ex; break; catch e; warn(e); end
     end) |> esc
 end
 
