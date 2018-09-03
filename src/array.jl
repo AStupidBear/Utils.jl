@@ -67,8 +67,8 @@ ccount(x::Tuple) = ccount(x[1])
 rcount(x::Tuple) = rcount(x[1])
 
 export eachrow, eachcol, eachslice
-eachrow(x) = julienne(x, (*, :))
-eachcol(x) = julienne(x, (:, *))
+eachrow(x::AbstractArray{T, N}) where {T, N} = eachslice(x, Val{1})
+eachcol(x::AbstractArray{T, N}) where {T, N} = eachslice(x, Val{N})
 @generated function eachslice(x::AbstractArray{T, N}, ::Type{Val{D}}) where {T, N, D}
     t = ntuple(i -> i == D ? (*) : (:), N)
     :(JuliennedArrays.julienne(x, $t))
