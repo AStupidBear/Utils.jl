@@ -105,12 +105,20 @@ vechcat(xs) = veccat(2, xs)
 
 export unsqueeze, stack, unstack
 unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim-1]..., 1, size(xs)[dim:end]...))
-stack(xs, dim) = cat(dim, unsqueeze.(xs, dim)...)
-unstack(xs, dim) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
+stack(xs::Union{Vector{<:AbstractArray}, Tuple}, dim::Integer) = cat(dim, unsqueeze.(xs, dim)...)
+unstack(xs::Union{Vector{<:AbstractArray}, Tuple}, dim::Integer) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
+stack(dim::Integer, xs::AbstractArray...) = stack(xs, dim)
+unstack(dim::Integer, xs::AbstractArray...) = unstack(xs, dim)
 
 export cstack, rstack
-cstack(xs) = stack(xs, ndims(first(xs)))
-rstack(xs) = stack(xs, 1)
+cstack(xs::Union{Vector{<:AbstractArray}, Tuple}) = stack(xs, ndims(first(xs)) + 1)
+rstack(xs::Union{Vector{<:AbstractArray}, Tuple}) = stack(xs, 1)
+cstack(xs::AbstractArray...) = cstack(xs)
+rstack(xs::AbstractArray...) = rstack(xs)
+
+# x = rand(2, 2)
+# y = rand(2, 2)
+# stack(3, x, y) == stack([x, y], 3) == cstack(x, y) == cstack([x, y])
 
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
