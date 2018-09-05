@@ -103,6 +103,15 @@ export vecvcat, vechcat
 vecvcat(xs) = veccat(1, xs)
 vechcat(xs) = veccat(2, xs)
 
+export unsqueeze, stack, unstack
+unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim-1]..., 1, size(xs)[dim:end]...))
+stack(xs, dim) = cat(dim, unsqueeze.(xs, dim)...)
+unstack(xs, dim) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
+
+export cstack, rstack
+cstack(xs) = stack(xs, ndims(first(xs)))
+rstack(xs) = stack(xs, 1)
+
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
 #     for col in 1:length(colptr)-1
