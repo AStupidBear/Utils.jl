@@ -84,8 +84,7 @@ unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim - 1]..., 1, size(xs)[dim:end]..
 
 Base.permutedims(x::AbstractArray) = permutedims(x, ndims(x):-1:1)
 
-export veccat
-function veccat(xs::Vector{<:AbstractArray{T, N}}, dim::Integer) where {T, N}
+function Base.cat(xs::Vector{<:AbstractArray{T, N}}, dim::Integer) where {T, N}
     ysize = ntuple(i -> i != dim ? size(first(xs), i) : sum(size(x, dim) for x in xs), Val{N})
     y = zeros(T, ysize)
     pos = 0
@@ -97,14 +96,9 @@ function veccat(xs::Vector{<:AbstractArray{T, N}}, dim::Integer) where {T, N}
     end
     return y
 end
-veccat(dim::Integer, xs::AbstractArray...) = veccat(collect(xs), dim)
-
-export vecvcat, vechcat
-vecvcat(xs) = veccat(xs, 1)
-vechcat(xs) = veccat(xs, 2)
 
 export stack, unstack
-stack(xs::Vector{<:AbstractArray}, dim::Integer) = veccat(unsqueeze.(xs, dim), dim)
+stack(xs::Vector{<:AbstractArray}, dim::Integer) = cat(unsqueeze.(xs, dim), dim)
 unstack(xs::Vector{<:AbstractArray}, dim::Integer) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
 stack(dim::Integer, xs::AbstractArray...) = stack(collect(xs), dim)
 unstack(dim::Integer, xs::AbstractArray...) = unstack(collect(xs), dim)
