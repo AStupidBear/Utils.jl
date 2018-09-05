@@ -85,9 +85,8 @@ unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim - 1]..., 1, size(xs)[dim:end]..
 Base.permutedims(x::AbstractArray) = permutedims(x, ndims(x):-1:1)
 
 export veccat
-function veccat(dim, xs::Vector{<:AbstractArray{T, N}}) where {T, N}
-    x1 = xs[1]
-    ysize = ntuple(i -> i != dim ? size(x1, i) : sum(size(x, dim) for x in xs), Val{N})
+function veccat(xs::Vector{<:AbstractArray{T, N}}, dim::Integer) where {T, N}
+    ysize = ntuple(i -> i != dim ? size(first(xs), i) : sum(size(x, dim) for x in xs), Val{N})
     y = zeros(T, ysize)
     pos = 0
     for x in xs
@@ -98,22 +97,23 @@ function veccat(dim, xs::Vector{<:AbstractArray{T, N}}) where {T, N}
     end
     return y
 end
+veccat(dim::Integer, xs::AbstractArray...) = veccat(collect(xs), dim)
 
 export vecvcat, vechcat
-vecvcat(xs) = veccat(1, xs)
-vechcat(xs) = veccat(2, xs)
+vecvcat(xs) = veccat(xs, 1)
+vechcat(xs) = veccat(xs, 2)
 
 export stack, unstack
-stack(xs::Union{Vector{<:AbstractArray}, Tuple}, dim::Integer) = cat(dim, unsqueeze.(xs, dim)...)
-unstack(xs::Union{Vector{<:AbstractArray}, Tuple}, dim::Integer) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
-stack(dim::Integer, xs::AbstractArray...) = stack(xs, dim)
-unstack(dim::Integer, xs::AbstractArray...) = unstack(xs, dim)
+stack(xs::Vector{<:AbstractArray}, dim::Integer) = veccat(unsqueeze.(xs, dim), dim)
+unstack(xs::Vector{<:AbstractArray}, dim::Integer) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
+stack(dim::Integer, xs::AbstractArray...) = stack(collect(xs), dim)
+unstack(dim::Integer, xs::AbstractArray...) = unstack(collect(xs), dim)
 
 export cstack, rstack
-cstack(xs::Union{Vector{<:AbstractArray}, Tuple}) = stack(xs, ndims(first(xs)) + 1)
-rstack(xs::Union{Vector{<:AbstractArray}, Tuple}) = stack(xs, 1)
-cstack(xs::AbstractArray...) = cstack(xs)
-rstack(xs::AbstractArray...) = rstack(xs)
+cstack(xs::Vector{<:AbstractArray}) = stack(xs, ndims(first(xs)) + 1)
+rstack(xs::Vector{<:AbstractArray}) = stack(xs, 1)
+cstack(xs::AbstractArray...) = cstack(collect(xs))
+rstack(xs::AbstractArray...) = rstack(collect(xs))
 
 # x = rand(2, 2)
 # y = rand(2, 2)
