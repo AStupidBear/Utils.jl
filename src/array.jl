@@ -103,8 +103,7 @@ export vecvcat, vechcat
 vecvcat(xs) = veccat(1, xs)
 vechcat(xs) = veccat(2, xs)
 
-export unsqueeze, stack, unstack
-unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim-1]..., 1, size(xs)[dim:end]...))
+export stack, unstack
 stack(xs::Union{Vector{<:AbstractArray}, Tuple}, dim::Integer) = cat(dim, unsqueeze.(xs, dim)...)
 unstack(xs::Union{Vector{<:AbstractArray}, Tuple}, dim::Integer) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
 stack(dim::Integer, xs::AbstractArray...) = stack(xs, dim)
