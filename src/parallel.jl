@@ -22,6 +22,9 @@ scc_end() = @eval current_module() (isdefined(Main, :MPI) && MPI.stop_main_loop(
 export everythread
 everythread(fun) = ccall(:jl_threading_run, Ref{Void}, (Any,), fun)
 
+export threadprint
+threadprint(x) =  ccall(:jl_, Void, (Any,), x)
+
 # export aws_setup
 # function aws_setup(n = 0)
 #     @eval using ClusterManagers; addprocs_qrsh(n)
