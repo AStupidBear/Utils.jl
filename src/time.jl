@@ -1,9 +1,6 @@
-export date, hour, minute, second, msecond
-date() = Dates.format(now(), "yyyy-mm-dd")
-hour() = Dates.format(now(), "yyyy-mm-dd_HH")
-minute() = Dates.format(now(), "yyyy-mm-dd_HH-MM")
-second() = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
-msecond() = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS-s")
+using Base.Dates: format, unix2datetime, Date, Time
 
-export timename
-timename(fn) = joinpath(tempdir(), fn * "_" * Dates.format(now(), "yyyy-mm-dd_HH-MM-SS-s"))
+export unix2date, unix2time
+
+unix2date(t) = Date(unix2datetime(t))
+unix2time(t) = Time(unix2datetime(t))
