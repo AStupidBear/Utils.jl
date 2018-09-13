@@ -25,6 +25,25 @@ everythread(fun) = ccall(:jl_threading_run, Ref{Void}, (Any,), fun)
 export threadprint
 threadprint(x) =  ccall(:jl_, Void, (Any,), x)
 
+function get_num_threads() # anonymous so it will be serialized when called
+    blas = BLAS.vendor()
+    # Wrap in a try to catch unsupported blas versions
+    try
+        if blas == :openblas
+            return ccall((:openblas_get_num_threads, Base.libblas_name), Cint, ())
+        elseif blas == :openblas64
+            return ccall((:openblas_get_num_threads64_, Base.libblas_name), Cint, ())
+        elseif blas == :mkl
+            return ccall((:MKL_Get_Max_Num_Threads, Base.libblas_name), Cint, ())
+        end
+        # OSX BLAS looks at an environment variable
+        if Sys.isapple()
+            return ENV["VECLIB_MAXIMUM_THREADS"]
+        end
+    end
+    return nothing
+end
+
 # export aws_setup
 # function aws_setup(n = 0)
 #     @eval using ClusterManagers; addprocs_qrsh(n)
