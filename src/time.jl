@@ -1,6 +1,7 @@
-using Base.Dates: format, unix2datetime, Date, Time
+using Base.Dates: format, unix2datetime, datetime2unix, Date, Time
 
-export unix2date, unix2time
+export unix2date, unix2time, unix2datetime, datetime2unix
 
 unix2date(t) = Date(unix2datetime(t))
 unix2time(t) = Time(unix2datetime(t))
+unix2intstr(t) = format(unix2datetime(t), "yyyymmdd")
