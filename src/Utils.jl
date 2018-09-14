@@ -29,6 +29,7 @@ include("traits.jl")
 include("sort.jl")
 include("iterators.jl")
 include("hash.jl")
+include("mmap.jl")
 
 include("encoder.jl")
 include("scaler.jl")
