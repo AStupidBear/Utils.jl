@@ -16,3 +16,6 @@ firstn(a::AbstractArray, n::Integer) = a[1:min(end, n)]
 
 export lastn
 lastn(a::AbstractArray, n::Integer) = a[max(1, end - n + 1):end]
+
+using Base: OneTo
+export OneTo
