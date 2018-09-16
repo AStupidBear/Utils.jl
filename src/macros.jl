@@ -153,7 +153,7 @@ end
 
 export @dir_str
 macro dir_str(path)
-    isinteractive() ? path : esc(:(joinpath(__@DIR__, $path)))
+    isinteractive() ? path : esc(:(joinpath(@__DIR__, $path)))
 end
 
 # using Lazy: isexpr, rmlines, splitswitch
