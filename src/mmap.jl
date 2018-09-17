@@ -1,7 +1,10 @@
-export mzeros, mones
+export mzeros, mones, mcopy
 
 for (fname, felt) in ((:mzeros,:zero), (:mones,:one))
     @eval begin
+        $fname(a::AbstractArray, T::Type, dims::Tuple) = $fname(T, dims)
+        $fname(a::AbstractArray, T::Type, dims...) = $fname(T, dims...)
+        $fname(a::AbstractArray, T::Type = eltype(a)) = $fname(T, size(a))
         function $fname(T::Type, dims::Tuple)
             isdir(".mempool") || mkdir(".mempool")
             file = joinpath(".mempool", randstring())
@@ -13,3 +16,5 @@ for (fname, felt) in ((:mzeros,:zero), (:mones,:one))
         $fname(dims...) = $fname(dims)
     end
 end
+
+mcopy(x) = copy!(mzeros(x), x)
