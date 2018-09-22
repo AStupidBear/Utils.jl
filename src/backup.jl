@@ -130,7 +130,7 @@ function threadcall(f::Function, run_on_thread::Int, args...; kwargs...)
             ret = f(args...;kwargs...)
             put!(rr, ret)
         end
-        ccall(:jl_threading_run, Void, (Any,), Core.svec(fun))  #Run it on all threads
+        ccall(:jl_threading_run, Nothing, (Any,), Core.svec(fun))  #Run it on all threads
         rr
     end
     @async inner()

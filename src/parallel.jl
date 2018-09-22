@@ -20,10 +20,10 @@ export scc_end
 scc_end() = @eval current_module() (isdefined(Main, :MPI) && MPI.stop_main_loop(mngr); exit())
 
 export everythread
-everythread(fun) = ccall(:jl_threading_run, Ref{Void}, (Any,), fun)
+everythread(fun) = ccall(:jl_threading_run, Ref{Nothing}, (Any,), fun)
 
 export threadprint
-threadprint(x) =  ccall(:jl_, Void, (Any,), x)
+threadprint(x) =  ccall(:jl_, Nothing, (Any,), x)
 
 function get_num_threads() # anonymous so it will be serialized when called
     blas = BLAS.vendor()
@@ -40,6 +40,7 @@ function get_num_threads() # anonymous so it will be serialized when called
         if Sys.isapple()
             return ENV["VECLIB_MAXIMUM_THREADS"]
         end
+    finally
     end
     return nothing
 end

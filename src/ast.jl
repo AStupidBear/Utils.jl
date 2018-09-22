@@ -71,10 +71,10 @@ macro replace(ex)
 end
 
 export typename
-function typename{T}(x::T)
+function typename(x::T) where T
     name, ext = splitext(string(T.name))
     isempty(ext) ? name : ext[2:end]
 end
 
 export typeparam
-typeparam{T}(x::T) = T.parameters[1]
+typeparam(x::T) where {T} = T.parameters[1]

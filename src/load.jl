@@ -1,3 +1,8 @@
+using Compat
+using Compat.Serialization
+using Compat.Random
+using Compat.Sys: iswindows
+
 using Reexport
 
 @reexport using Parameters

@@ -70,7 +70,7 @@ end
 function inverse_transform(encoder::OneHotEncoder, vector)
     label = Array{eltype(encoder.unique_label)}(1, size(vector, 2))
     for j = 1:size(vector, 2)
-        i = indmax(vector[:, j])
+        i = argmax(vector[:, j])
         label[1, j] = encoder.unique_label[i]
     end
     label

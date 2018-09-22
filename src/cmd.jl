@@ -1,4 +1,4 @@
-Base.run(str::AbstractString) = @static is_windows() ? ps(str) : bash(str)
+Base.run(str::AbstractString) = @static iswindows() ? ps(str) : bash(str)
 
 export @bat_str
 macro bat_str(str, exe = "run")

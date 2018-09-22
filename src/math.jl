@@ -83,11 +83,9 @@ function pctchange(x, T)
     return z
 end
 
-export cutoff
 heaviside(x) = 0.5 * (1 + sign(x))
 delta(x, δx = 1e-3) = (heaviside(x + δx / 2) - heaviside(x - δx / 2)) / δx
 interval(x, xmin, xmax) = x > xmax ? 0.0 : (x < xmin ? 0.0 : 1.0)
-cutoff{T}(x::T, xmin, xmax)::T =   x < xmin ? xmin : x > xmax ? xmax : x
 
 export hardmax
 softmax(x, dim = 1) = (y = exp.(x); y ./ sum(y, dim))

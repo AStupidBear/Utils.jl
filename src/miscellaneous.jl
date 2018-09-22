@@ -32,10 +32,10 @@ end
 
 export pkill
 function pkill(name)
-    if is_windows()
-        try run(pipeline(`pgrep $name`, `xargs -n 1 kill`)) end
+    if iswindows()
+        try run(pipeline(`pgrep $name`, `xargs -n 1 kill`)) finally end
     else
-        try run(`pkill -f -9 $name`) end
+        try run(`pkill -f -9 $name`) finally end
     end
 end
 

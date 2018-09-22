@@ -74,9 +74,9 @@ eachcol(x::AbstractArray{T, N}) where {T, N} = eachslice(x, Val{N})
     :(JuliennedArrays.julienne(x, $t))
 end
 
-Base.start(x::Void) = 0
-Base.done(x::Void, n::Int64) = true
-Base.length(x::Void) = 0
+Base.start(x::Nothing) = 0
+Base.done(x::Nothing, n::Int64) = true
+Base.length(x::Nothing) = 0
 Base.step(x::AbstractArray) = mean(diff(x))
 
 export unsqueeze

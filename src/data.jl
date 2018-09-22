@@ -4,7 +4,7 @@ x = rand(3,1000); y = rand(100,1); z = rand(100,3)
 seq2stack(3, x); seq2stack(3, x, y);
 seq2stack(3, x, y, z)
 """
-function seq2stack{T}(tstack::Int, seq::Array{T})
+function seq2stack(tstack::Int, seq::Array{T}) where T
     nr, nc = size(seq)
     stack = zeros(T, nr * tstack, nc)
     for t in 1:nc
@@ -16,7 +16,7 @@ function seq2stack{T}(tstack::Int, seq::Array{T})
     return stack
 end
 
-function seq2stack{T}(tstack::Int, x::Array{T}, ys...)
+function seq2stack(tstack::Int, x::Array, ys...)
     xstack = seq2stack(tstack, x)
     ystack = []
     for y in ys
@@ -94,7 +94,7 @@ function balance(x, y; featuredim = "col", sampleratio = 1.0)
     return xb, yb
 end
 
-function Base.shuffle(x::Union{AbstractArray, Tuple}, y::Union{AbstractArray, Tuple}; featuredim = "col")
+function Random.shuffle(x::Union{AbstractArray, Tuple}, y::Union{AbstractArray, Tuple}; featuredim = "col")
     if featuredim == "col"
         getfun, setfun, countfun = cview, cset!, ccount
     elseif featuredim == "row"

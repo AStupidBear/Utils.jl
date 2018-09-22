@@ -132,7 +132,7 @@ end
 export @correct
 macro correct(ex)
     res = gensym()
-    :($res = try $ex end; $res == nothing ? false : $res) |> esc
+    :($res = try $ex finally end; $res == nothing ? false : $res) |> esc
 end
 
 export ntry

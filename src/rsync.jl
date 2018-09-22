@@ -1,6 +1,6 @@
 export rsync
 function rsync(src::String, dst::String, port = 22; passwd = "", opts = `-avPh`)
-    src = is_windows() ? cygdrive(src) : src
+    src = iswindows() ? cygdrive(src) : src
     if isempty(passwd)
         @ignore run(`rsync $opts -e "ssh -p $port" $src $dst`)
     else

@@ -5,7 +5,7 @@ abstract type Parameter end
 
 getparam(param::Parameter) = fieldvalues(param)[1:(end - 1)]
 
-catparam{T<:Parameter}(param::T, c) = T(c..., param.bounds)
+catparam(param::T, c) where {T <: Parameter} = T(c..., param.bounds)
 
 function setparam!(param::Parameter, name, x)
     setfield!(param, name, x)
@@ -65,7 +65,7 @@ macro param(ex)
     esc(:(@with_kw $ex))
 end
 
-function Base.insert!{T}(collection::Array{T, 1}, index::Integer, items::Array{T, 1})
+function Base.insert!(collection::Vector{T}, index::Integer, items::Vector{T}) where T
     for item in items
         Base.insert!(collection, index, item)
         index += 1

@@ -38,7 +38,6 @@ fit(scaler, x, ((2, 2),))
 transform(scaler, x)
 ```
 """
-
 @with_kw mutable struct ShapeScaler
     scalers::Vector{MinMaxScaler} = Vector{MinMaxScaler}()
     shapes::Tuple = ()

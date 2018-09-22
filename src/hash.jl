@@ -2,9 +2,9 @@ using Base: SummarySize
 
 export memoryhash
 
-function memoryhash(obj::ANY;
-                     exclude::ANY = Union{DataType, TypeName, Method},
-                     chargeall::ANY = Union{TypeMapEntry, Core.MethodInstance})
+function memoryhash(obj;
+                     exclude = Union{DataType, TypeName, Method},
+                     chargeall = Union{TypeMapEntry, Core.MethodInstance})
     h = UInt(0)
     ss = SummarySize(ObjectIdDict(), Any[], Int[], exclude, chargeall)
     size::Int = ss(obj)

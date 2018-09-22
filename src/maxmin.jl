@@ -1,11 +1,14 @@
-export indmax
-"indmax(x, y, z)"
-function Base.indmax(xs...) # mimic max(xs...)
-    Int[indmax(collect(x)) for x in zip(xs...)]
+
+import Compat: argmax, argmin
+export argmax, argmin
+
+"argmax(x, y, z)"
+function argmax(xs...) # mimic max(xs...)
+    Int[argmax(collect(x)) for x in zip(xs...)]
 end
 
-"indmax(x, dim)"
-function Base.indmax(x, dim::Int) # mimic maximum(x, dim)
+"argmax(x, dim)"
+function argmax(x, dim::Int) # mimic maximum(x, dim)
     ind2sub(size(x), vec(findmax(x, dim)[2]))[dim]
 end
 
@@ -46,13 +49,13 @@ function Base.findmax(f::Function, x; parallel = false)
     return x[i], y[i]
 end
 
-function Base.indmax(f::Function, x; parallel = false)
+function argmax(f::Function, x; parallel = false)
     y = parallel ? pmap(f, x) : map(f, x)
     yi, i = findmax(y)
     return i
 end
 
-function Base.indmin(f::Function, x; parallel = false)
+function argmin(f::Function, x; parallel = false)
     y = parallel ? pmap(f, x) : map(f, x)
     yi, i = findmin(y)
     return i
