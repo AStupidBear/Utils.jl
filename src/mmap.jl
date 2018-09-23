@@ -17,4 +17,4 @@ for (fname, felt) in ((:mzeros,:zero), (:mones,:one))
     end
 end
 
-mcopy(x) = copy!(mzeros(x), x)
+mcopy(x) = copyto!(mzeros(x), x)

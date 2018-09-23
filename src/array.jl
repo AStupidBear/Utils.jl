@@ -91,7 +91,7 @@ function Base.cat(xs::Vector{<:AbstractArray{T, N}}, dim::Integer) where {T, N}
     for x in xs
         slice = (pos + 1):(pos + size(x, dim))
         inds = ntuple(@closure(i -> i != dim ? (1:size(y, i)) : slice), Val{N})
-        copy!(view(y, inds...), x)
+        copyto!(view(y, inds...), x)
         pos += size(x, dim)
     end
     return y

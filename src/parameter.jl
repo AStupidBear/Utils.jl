@@ -107,4 +107,4 @@ function delete_line!(ex::Expr)
     end
 end
 
-unroll(x, name) = [getfield(x, s) for s in fieldnames(x) if contains(string(s), string(name))]
+unroll(x, name) = [getfield(x, s) for s in fieldnames(x) if occursin(string(name), string(s))]

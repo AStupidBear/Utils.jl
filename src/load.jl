@@ -1,6 +1,7 @@
 using Compat
 using Compat.Serialization
 using Compat.Random
+using Compat.Mmap
 using Compat.Sys: iswindows
 
 using Reexport
