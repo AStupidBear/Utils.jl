@@ -11,13 +11,13 @@ end
 
 export scc_setup
 function scc_setup()
-    is_linux() && !isinteractive() && @eval current_module() begin
+    islinux() && !isinteractive() && @eval @__MODULE__ begin
         using MPI; mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
     end
 end
 
 export scc_end
-scc_end() = @eval current_module() (isdefined(Main, :MPI) && MPI.stop_main_loop(mngr); exit())
+scc_end() = @eval @__MODULE__ (isdefined(Main, :MPI) && MPI.stop_main_loop(mngr); exit())
 
 export everythread
 everythread(fun) = ccall(:jl_threading_run, Ref{Nothing}, (Any,), fun)
