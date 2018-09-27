@@ -9,8 +9,8 @@ macro everynode(ex)
     end |> esc
 end
 
-export scc_setup
-function scc_setup()
+export scc_start
+function scc_start()
     islinux() && !isinteractive() && @eval Main begin
         using MPI; mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
     end
