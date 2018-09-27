@@ -115,8 +115,13 @@ macro logto(fn)
 end
 
 export @nt
-macro nt(exs...)
-    esc(:(@NT($(exs...))($(exs...))))
+macro nt(xs...)
+    @static if VERSION >= v"0.7.0"
+        xs = [:($x = $x) for x in xs]
+        esc(:(($(xs...),)))
+    else
+        esc(:(@NT($(xs...))($(xs...))))
+    end
 end
 
 export @ignore
