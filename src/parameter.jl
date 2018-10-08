@@ -1,3 +1,5 @@
+@inline Parameters.pack!(x, ::Val{f}, val) where f = setfield!(x, f, fieldtype(typeof(x), f)(val))
+
 export Parameter, getparam, catparam, setparam!, delete_line!, unroll, unroll_block!
 export @rep, @param, @withkw
 
