@@ -53,7 +53,7 @@ end
 
 export diffn
 function diffn(n, x, y = x)
-    dx = zeros(x)
+    dx = zero(x)
     for t in (n + 1):length(x)
         dx[t] = x[t] - y[t-n]
     end
@@ -62,7 +62,7 @@ end
 
 export change
 function change(x, T)
-    dx = zeros(x)
+    dx = zero(x)
     for t in linearindices(x)
         t′ = clamp(t - T, 1, length(x))
         t1, t2 = minmax(t, t′)
@@ -74,7 +74,7 @@ end
 export pctchange
 function pctchange(x, T)
     ϵ = eps(eltype(x))
-    z = zeros(x)
+    z = zero(x)
     for t in linearindices(x)
         t′ = clamp(t - T, 1, length(x))
         t1, t2 = minmax(t, t′)

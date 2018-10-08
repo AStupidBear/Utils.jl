@@ -1,6 +1,6 @@
 export mzeros, mones, mcopy
 
-for (fname, felt) in ((:mzeros,:zero), (:mones,:one))
+for (fname, felt) in ((:mzeros, :zero), (:mones, :one))
     @eval begin
         $fname(a::AbstractArray, T::Type, dims::Tuple) = $fname(T, dims)
         $fname(a::AbstractArray, T::Type, dims...) = $fname(T, dims...)
