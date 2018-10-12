@@ -1,4 +1,4 @@
-export mzeros, mones, mcopy
+export mzeros, mones, mcopy, @mmap
 
 for (fname, felt) in ((:mzeros, :zero), (:mones, :one))
     @eval begin
@@ -18,3 +18,7 @@ for (fname, felt) in ((:mzeros, :zero), (:mones, :one))
 end
 
 mcopy(x) = copyto!(mzeros(x), x)
+
+macro mmap(ex)
+    esc(ex)
+end
