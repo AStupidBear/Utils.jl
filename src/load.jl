@@ -1,7 +1,4 @@
-using Compat
-using Compat.Serialization
-using Compat.Random
-using Compat.Mmap
+using Compat, Compat.Serialization, Compat.Random, Compat.Mmap
 using Compat.Sys: iswindows, islinux
 
 using Reexport
