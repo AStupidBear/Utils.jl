@@ -61,7 +61,6 @@ for s in (:cset!, :rset!)
 end
 
 Base.transpose(x::Tuple) = transpose.(x)
-Base.ctranspose(x::Tuple) = ctranspose.(x)
 
 ccount(x::Tuple) = ccount(x[1])
 rcount(x::Tuple) = rcount(x[1])
@@ -74,10 +73,12 @@ eachcol(x::AbstractArray{T, N}) where {T, N} = eachslice(x, Val{N})
     :(JuliennedArrays.julienne(x, $t))
 end
 
-Base.start(x::Nothing) = 0
-Base.done(x::Nothing, n::Int64) = true
-Base.length(x::Nothing) = 0
-Base.step(x::AbstractArray) = mean(diff(x))
+@static if VERSION < v"1.0"
+    Base.start(x::Nothing) = 0
+    Base.done(x::Nothing, n::Int64) = true
+    Base.length(x::Nothing) = 0
+    Base.step(x::AbstractArray) = mean(diff(x))
+end
 
 export unsqueeze
 unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim - 1]..., 1, size(xs)[dim:end]...))
