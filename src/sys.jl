@@ -19,8 +19,16 @@ function cron(fn, repeat)
 end
 
 export parseenv
-parseenv(key, default) = parse(typeof(default), get(ENV, string(key), string(default)))
 parseenv(key, default::String) = get(ENV, string(key), string(default))
+
+function parseenv(key, default::T) where T
+    str = get(ENV, string(key), string(default))
+    if hasmethod(parse, (Type{T}, String))
+        parse(T, str)
+    else
+        include_string(@__MODULE__, str)
+    end
+end
 
 # function proxy(url)
 #     regKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
