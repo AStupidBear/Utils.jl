@@ -26,7 +26,7 @@ function parseenv(key, default::T) where T
     if hasmethod(parse, (Type{T}, String))
         parse(T, str)
     else
-        include_string(@__MODULE__, str)
+        include_string(Main, str)
     end
 end
 
