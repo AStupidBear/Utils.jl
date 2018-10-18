@@ -100,9 +100,14 @@ end
 
 export stack, unstack
 stack(xs::Vector{<:AbstractArray}, dim::Integer) = cat(unsqueeze.(xs, dim), dim)
-unstack(xs::Vector{<:AbstractArray}, dim::Integer) = [slicedim(xs, dim, i) for i = 1:size(xs, dim)]
-stack(dim::Integer, xs::AbstractArray...) = stack(collect(xs), dim)
-unstack(dim::Integer, xs::AbstractArray...) = unstack(collect(xs), dim)
+unstack(xs::Vector{<:AbstractArray}, dim::Integer) = [slicedim(xs, dim, i) for i in 1:size(xs, dim)]
+@static if VERSION >= v"0.7"
+    stack(xs::AbstractArray...; dims) = stack(collect(xs), dim)
+    unstack(xs::AbstractArray...; dims) = unstack(collect(xs), dim)
+else
+    stack(xs::AbstractArray...; dims = 1) = stack(collect(xs), dim)
+    unstack(xs::AbstractArray...; dims = 1) = unstack(collect(xs), dim)
+end   
 
 export cstack, rstack
 cstack(xs::Vector{<:AbstractArray}) = stack(xs, ndims(first(xs)) + 1)
