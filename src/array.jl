@@ -132,3 +132,6 @@ rstack(xs::AbstractArray...) = rstack(collect(xs))
 export zeroel, oneel
 zeroel(x) = zero(eltype(x))
 oneel(x) = one(eltype(x))
+
+export countunique
+countunique(itr) = length(Set(itr))
