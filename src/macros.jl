@@ -157,8 +157,14 @@ macro trys(exs...)
 end
 
 export @dir_str
-macro dir_str(path)
-    isinteractive() ? path : esc(:(joinpath(@__DIR__, $path)))
+macro dir_str(src)
+    joinpath(dirname(string(__source__.file)), src)
+end
+
+export @include
+macro include(src)
+    src = joinpath(dirname(string(__source__.file)), src)
+    :(@eval include($src))
 end
 
 # using Lazy: isexpr, rmlines, splitswitch
