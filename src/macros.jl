@@ -167,7 +167,7 @@ macro include(src)
     :(@eval include($src))
 end
 
-@export redirect
+export @redirect
 macro redirect(src, ex)
     src = src == :devnull ? "/dev/null" : src
     quote
