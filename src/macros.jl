@@ -167,6 +167,21 @@ macro include(src)
     :(@eval include($src))
 end
 
+@export redirect
+macro redirect(src, ex)
+    src = src == :devnull ? "/dev/null" : src
+    quote
+        io = open($src, "a")
+        o, e = stdout, stderr
+        redirect_stdout(io)
+        redirect_stderr(io)
+        $(esc(ex)); sleep(0.01)
+        flush(io); close(io)
+        redirect_stdout(o)
+        redirect_stderr(e)
+    end
+end
+
 # using Lazy: isexpr, rmlines, splitswitch
 # export @switch
 # macro switch(args...)
