@@ -171,7 +171,7 @@ export @redirect
 macro redirect(src, ex)
     src = src == :devnull ? "/dev/null" : src
     quote
-        io = open($src, "a")
+        io = open($(esc(src)), "a")
         o, e = stdout, stderr
         redirect_stdout(io)
         redirect_stderr(io)
