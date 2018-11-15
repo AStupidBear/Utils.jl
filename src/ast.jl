@@ -33,8 +33,8 @@ function has_symbol(ex, s)
 end
 
 export fieldvalues, fields
-fieldvalues(x) = [getfield(x, s) for s in fieldnames(x)]
-fields(x) = [(s, getfield(x, s)) for s in fieldnames(x)]
+fieldvalues(x) = [getfield(x, s) for s in fieldnames(typeof(x))]
+fields(x) = [(s, getfield(x, s)) for s in fieldnames(typeof(x))]
 
 export hasfield
 hasfield(x, s) = isdefined(x, s)
