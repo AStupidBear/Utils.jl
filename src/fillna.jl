@@ -1,4 +1,4 @@
-export isna, fillna, fillna!
+export isna, fillna!
 
 isna(x::Float32, θ = 0f0) = abs(x) < θ || isnan(x)
 
