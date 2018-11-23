@@ -17,7 +17,11 @@ function scc_start()
 end
 
 export scc_end
-scc_end() = @eval Main (isdefined(Main, :MPI) && MPI.stop_main_loop(mngr); exit())
+function scc_end()
+    isdefined(Main, :MPI) && @eval Main begin
+        MPI.stop_main_loop(mngr)
+    end
+end
 
 export everythread
 everythread(fun) = ccall(:jl_threading_run, Ref{Nothing}, (Any,), fun)
