@@ -11,7 +11,9 @@ end
 
 export scc_start
 function scc_start()
-    usempi = islinux() && occursin("mpi", read(`pstree -s $(getpid())`, String))
+    iswindows() && return
+    pstree = read(`pstree -s $(getpid())`, String)
+    usempi = occursin("mpi", pstree) || occursin("slurm", pstree)
     usempi && @eval Main begin
         using MPI; mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
     end
