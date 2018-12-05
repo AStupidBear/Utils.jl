@@ -9,12 +9,16 @@ macro everynode(ex)
     end |> esc
 end
 
+export inmpi
+function inmpi()
+    pstree = read(`pstree -s $(getpid())`, String)
+    occursin("mpi", pstree) || occursin("slurm", pstree)
+end
+
 export scc_start
 function scc_start()
     iswindows() && return
-    pstree = read(`pstree -s $(getpid())`, String)
-    usempi = occursin("mpi", pstree) || occursin("slurm", pstree)
-    usempi && @eval Main begin
+    inmpi() && @eval Main begin
         using MPI; mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
     end
 end
