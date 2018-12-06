@@ -11,8 +11,12 @@ end
 
 export inmpi
 function inmpi()
-    pstree = read(`pstree -s $(getpid())`, String)
-    occursin("mpi", pstree) || occursin("slurm", pstree)
+    try
+        pstree = read(`pstree -s $(getpid())`, String)
+        occursin("mpi", pstree) || occursin("slurm", pstree)
+    catch
+        true
+    end
 end
 
 export scc_start
