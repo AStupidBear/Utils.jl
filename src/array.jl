@@ -84,6 +84,7 @@ export unsqueeze
 unsqueeze(xs, dim) = reshape(xs, (size(xs)[1:dim - 1]..., 1, size(xs)[dim:end]...))
 
 Base.permutedims(x::AbstractArray) = permutedims(x, ndims(x):-1:1)
+Base.PermutedDimsArray(x::AbstractArray) = PermutedDimsArray(x, ndims(x):-1:1)
 
 function Base.cat(xs::Vector{<:AbstractArray{T, N}}, dim::Integer) where {T, N}
     ysize = ntuple(i -> i != dim ? size(first(xs), i) : sum(size(x, dim) for x in xs), Val(N))
