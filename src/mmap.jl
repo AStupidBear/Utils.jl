@@ -17,7 +17,7 @@ for (fname, felt) in ((:mzeros, :zero), (:mones, :one))
     end
 end
 
-mcopy(x) = copyto!(mzeros(x), x)
+mcopy(x) = copyto!(mzeros(values(x)), values(x))
 
 macro mmap(ex)
     esc(ex)
