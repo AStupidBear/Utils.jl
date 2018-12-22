@@ -11,7 +11,8 @@ for (fname, felt) in ((:mzeros, :zero), (:mones, :one))
         $fname(a::AbstractArray, T::Type, dims...) = $fname(T, dims...)
         $fname(a::AbstractArray, T::Type = eltype(a)) = $fname(T, size(a))
         function $fname(T::Type, dims::Tuple)
-            fid = open(mmap_tempname(), "w+")
+            src = mmap_tempname()
+            fid = open(src, "w+")
             for i in prod(dims)
                 write(fid, $felt(T))
             end
@@ -19,6 +20,7 @@ for (fname, felt) in ((:mzeros, :zero), (:mones, :one))
             x = Mmap.mmap(fid, Array{T, length(dims)}, dims)
             fill!(x, $felt(T))
             close(fid)
+            finalizer(z -> rm(src), x)
             return x
         end
         $fname(dims::Tuple) = ($fname)(Float64, dims)
@@ -28,12 +30,13 @@ for (fname, felt) in ((:mzeros, :zero), (:mones, :one))
 end
 
 function mcopy(x::AbstractArray{T, N}) where {T, N}
-    file = mmap_tempname()
-    fid = open(file, "w+")
+    src = mmap_tempname()
+    fid = open(src, "w+")
     write(fid, x)
     seekstart(fid)
     xm = Mmap.mmap(fid, Array{T, N}, size(x))
     close(fid)
+    finalizer(z -> rm(src), xm)
     return xm
 end
 
