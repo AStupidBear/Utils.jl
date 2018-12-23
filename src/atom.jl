@@ -7,7 +7,7 @@ function Atom.view(m::Atom.Method)
     tv, decls, file, line = Base.arg_decl_parts(m)
     # file = replace(string(file), "/BIGDATA1/highchain_ylu_1" => "D:")
     link = file == :null ? "not found" : Atom.baselink(string(file), line)
-    file = replace(link.file, "/BIGDATA1/highchain_ylu_1" => "D:")
+    file = replace(link.file, "/BIGDATA1/highchain_ylu_1" => "Z:")
     HTML(str), Atom.Link(file, link.line, link.contents...)
 end
 
