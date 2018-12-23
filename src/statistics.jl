@@ -6,14 +6,13 @@ function histn(xs::Array...; o...)
 end
 
 export edge2center
-"edge2center(0:0.1:1)"
 function edge2center(edge)
     dx = edge[2] - edge[1]
-    center = edge[1:(end - 1)] + dx / 2
+    center = edge[1:(end - 1)] .+ dx / 2
 end
 
 export xcov
-xcov(A,B) = xcorr(A .- mean(A), B .- mean(B))
+xcov(x, y) = xcorr(x .- mean(x), y .- mean(y))
 
 export countunique
 countunique(x) = last.(sort(collect(StatsBase.countmap(x)), by = first))

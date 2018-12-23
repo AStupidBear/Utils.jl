@@ -1,4 +1,4 @@
-using Reexport
+using Reexport, Requires
 
 @reexport using Compat
 using Compat.Printf, Compat.Mmap, Compat.Serialization, Compat.LinearAlgebra, Compat.Dates
