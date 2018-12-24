@@ -1,6 +1,3 @@
-export capitalize
-capitalize = uppercase
-
-@static if VERSION < v"1.0"
-Base.find(s::String, c::Union{Char, Vector{Char}, String, Regex}, start = 1) = search(s, c, start)
-end
+export str2float, float2str
+str2float(str) = reinterpret(Float32, resize!(Vector{UInt8}(str), 4))[1]
+float2str(int) = strip(String(reinterpret(UInt8, [int])), '\0')
