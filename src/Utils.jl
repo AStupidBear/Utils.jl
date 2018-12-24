@@ -27,8 +27,7 @@ include("iterators.jl")
 include("hash.jl")
 include("mmap.jl")
 include("fillna.jl")
-
-include("data.jl")
+include("string.jl")
 
 function __init__()
     @require Atom="c52e3926-4ff0-5f6e-af25-54175e0327b1" include("atom.jl")
