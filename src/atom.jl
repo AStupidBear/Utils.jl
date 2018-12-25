@@ -1,14 +1,10 @@
-using Atom: Method, HTML
+using Atom: expandpath, span, link, Text, appendline
 
-function Atom.view(m::Atom.Method)
-    str = sprint(show, "text/html", m)
-    str = replace(str, r" in .* at .*$" => "")
-    str = string("<span>", str, "</span>")
-    tv, decls, file, line = Base.arg_decl_parts(m)
-    # file = replace(string(file), "/BIGDATA1/highchain_ylu_1" => "D:")
-    link = file == :null ? "not found" : Atom.baselink(string(file), line)
-    file = replace(link.file, "/BIGDATA1/highchain_ylu_1" => "Z:")
-    HTML(str), Atom.Link(file, link.line, link.contents...)
+function Atom.baselink(path, line)
+  name, path = expandpath(path)
+  path = replace(path, "/BIGDATA1/highchain_ylu_1" => "D:")
+  name == "<unkown file>" ? span(".fade", "<unknown file>") :
+                            link(path, line, Text(appendline(name, line)))
 end
 
 # enable(pkg) = try run(`apm.cmd enable $pkg`) end
