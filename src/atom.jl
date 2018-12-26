@@ -1,4 +1,4 @@
-using Atom: isuntitled, isfile′, basepath
+using Atom: isuntitled, isfile′, basepath, pkgpath
 
 function Atom.expandpath(path)
     name, path = if isempty(path)
