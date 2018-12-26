@@ -1,10 +1,26 @@
-using Atom: expandpath, span, link, Text, appendline
+using Atom: isuntitled, isfile′, basepath
 
-function Atom.baselink(path, line)
-  name, path = expandpath(path)
-  path = replace(path, "/BIGDATA1/highchain_ylu_1" => "D:")
-  name == "<unkown file>" ? span(".fade", "<unknown file>") :
-                            link(path, line, Text(appendline(name, line)))
+function Atom.expandpath(path)
+    name, path = if isempty(path)
+        (path, path)
+    elseif occursin(r"\./[A-F]", path)
+        (basename(path), replace(path, "./" => ""))
+    elseif path == "./missing"
+        ("<unknown file>", path)
+    elseif isuntitled(path)
+        ("untitled", path)
+    elseif !isabspath(path)
+        (normpath(joinpath("base", path)), basepath(path))
+    elseif occursin(joinpath("julia", "stdlib"), path)
+        p = last(split(path, joinpath("julia", "stdlib", "")))
+        name = normpath(joinpath("stdlib", p))
+        path = isfile′(path) ? path : normpath(joinpath(basepath(joinpath("..", "stdlib")), p))
+        name, path
+    else
+        (pkgpath(path), path)
+    end
+    path = replace(path, homedir() => "D:")
+    return name, path
 end
 
 # enable(pkg) = try run(`apm.cmd enable $pkg`) end
