@@ -157,15 +157,16 @@ macro trys(exs...)
 end
 
 export @dir_str
-macro dir_str(src)
-    joinpath(dirname(string(__source__.file)), src)
-end
+macro dir_str(src) joinpath(dirname(string(__source__.file)), src) end
 
 export @include
 macro include(src)
     src = joinpath(dirname(string(__source__.file)), src)
     :(@eval include($src))
 end
+
+export @home_str
+macro home_str(path) :(joinpath(homedir(), $path)) end
 
 export @redirect
 macro redirect(src, ex)
