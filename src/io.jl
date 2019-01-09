@@ -16,3 +16,10 @@ function Base.eachline(filename::AbstractString; chomp=nothing, keep::Bool=false
     s = open(filename)
     EachLine(s, ondone=()->(restart ? seekstart : close)(s), keep=keep)::EachLine
 end
+
+function Base.length(el::EachLine)
+    pos = position(el.stream)
+    n = countlines(el.stream)
+    seek(el.stream, pos)
+    return n
+end
