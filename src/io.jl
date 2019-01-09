@@ -8,12 +8,11 @@ Serialization.serialize(file::AbstractString, x) = open(file, "w") do fid serial
 Serialization.deserialize(file::AbstractString) = open(file, "r") do fid deserialize(fid) end
 
 using Base: EachLine
-export cycleline
-function cycleline(filename::AbstractString; chomp=nothing, keep::Bool=false)
+function Base.eachline(filename::AbstractString; chomp=nothing, keep::Bool=false, restart = false)
     if chomp !== nothing
         keep = !chomp
         depwarn("The `chomp=$chomp` argument to `eachline` is deprecated in favor of `keep=$keep`.", :eachline)
     end
     s = open(filename)
-    EachLine(s, ondone=()->seekstart(s), keep=keep)::EachLine
+    EachLine(s, ondone=()->(restart ? seekstart : close)(s), keep=keep)::EachLine
 end
