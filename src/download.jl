@@ -1,3 +1,4 @@
+export aria2c
 """
 ```
 aria2c("https://www.youtube.com")
