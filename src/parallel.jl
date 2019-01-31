@@ -15,7 +15,7 @@ function inmpi()
         pstree = read(`pstree -s $(getpid())`, String)
         occursin("mpi", pstree) || occursin("slurm", pstree)
     catch
-        true
+        !iswindows()
     end
 end
 
