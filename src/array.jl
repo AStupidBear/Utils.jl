@@ -136,3 +136,7 @@ oneel(x) = one(eltype(x))
 
 export countunique
 countunique(itr) = length(Set(itr))
+
+export rreshape, creshape
+rreshape(x) = reshape(x, size(x, 1), :)
+creshape(x) = reshape(x, :, size(x)[end])
