@@ -1,4 +1,4 @@
-using Compat.Dates: format, unix2datetime, datetime2unix, Date, Time
+using Dates: format, unix2datetime, datetime2unix, Date, Time
 
 export unix2datetime, datetime2unix
 export unix2date, unix2time

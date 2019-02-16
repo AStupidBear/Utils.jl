@@ -1,9 +1,8 @@
 using Reexport, Requires
 
-@reexport using Compat
-@reexport using Compat.Printf, Compat.Mmap, Compat.Serialization, Compat.LinearAlgebra, Compat.Dates
-@reexport using Compat.Statistics, Compat.Distributed, Compat.Random, Compat.DelimitedFiles
-@reexport using Compat.Sys: iswindows, islinux
+@reexport using Printf, Mmap, Serialization, LinearAlgebra, Dates
+@reexport using Statistics, Distributed, Random, DelimitedFiles
+using Base.Sys: iswindows, islinux
 
 @reexport using Parameters
 
