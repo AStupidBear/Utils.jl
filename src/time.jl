@@ -1,5 +1,6 @@
 using Dates: format, unix2datetime, datetime2unix, Date, Time
 
+export format
 export unix2datetime, datetime2unix
 export unix2date, unix2time
 export unix2str, unix2str8, unix2str6, str2unix
