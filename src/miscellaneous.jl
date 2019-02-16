@@ -32,7 +32,7 @@ end
 
 export pkill
 function pkill(name)
-    if iswindows()
+    if Sys.iswindows()
         try run(pipeline(`pgrep $name`, `xargs -n 1 kill`)) finally end
     else
         try run(`pkill -f -9 $name`) finally end

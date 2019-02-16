@@ -15,13 +15,13 @@ function inmpi()
         pstree = read(`pstree -s $(getpid())`, String)
         occursin("mpi", pstree) || occursin("slurm", pstree)
     catch
-        !iswindows()
+        !Sys.iswindows()
     end
 end
 
 export scc_start
 function scc_start()
-    iswindows() && return
+    Sys.iswindows() && return
     inmpi() && @eval Main begin
         using MPI; mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL)
     end
