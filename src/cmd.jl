@@ -25,7 +25,7 @@ macro ps_str(str, exe = "run")
     :(ps($str, $(symbol(exe))))
 end
 
-export ps
+export powershell
 # """
 # ```
 # str = """
@@ -34,7 +34,7 @@ export ps
 # """ |> ps
 # ```
 # """
-function ps(str, exe = run)
+function powershell(str, exe = run)
     exe(`powershell -Command $str`)
 end
 
