@@ -14,8 +14,8 @@ end
 export xcov
 xcov(x, y) = xcorr(x .- mean(x), y .- mean(y))
 
-export countunique
-countunique(x) = last.(sort(collect(StatsBase.countmap(x)), by = first))
+# export countunique
+# countunique(x) = last.(sort(collect(StatsBase.countmap(x)), by = first))
 
 # export entropy
 # "entropy(randn(10000))"
