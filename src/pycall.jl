@@ -12,6 +12,6 @@ end
 
 macro from(lib, imports, fs)
     lib, fs = string(lib), isa(fs, Expr) ? fs.args : [fs]
-    exs = [:($f = pyimport($lib)[$(string(f))]) for f in fs]
+    exs = [:($f = pyimport($lib).$(string(f))) for f in fs]
     esc(Expr(:block, exs...))
 end
