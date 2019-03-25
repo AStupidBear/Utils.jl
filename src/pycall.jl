@@ -23,7 +23,8 @@ macro imports(lib)
 end
 
 macro from(lib, imports, fs)
-    lib, fs = string(lib), isa(fs, Expr) ? fs.args : [fs]
-    exs = [:($f = pyimport($lib).$(string(f))) for f in fs]
+    fs = isa(fs, Expr) ? fs.args : [fs]
+    mdl = replace(string(lib), r"[\(\)]" => "")
+    exs = [:($f = pyimport($mdl).$(string(f))) for f in fs]
     esc(Expr(:block, exs...))
 end
