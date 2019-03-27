@@ -176,10 +176,13 @@ macro redirect(src, ex)
         o, e = stdout, stderr
         redirect_stdout(io)
         redirect_stderr(io)
-        $(esc(ex)); sleep(0.01)
-        flush(io); close(io)
-        redirect_stdout(o)
-        redirect_stderr(e)
+        try
+            $(esc(ex)); sleep(0.01)
+        finally
+            flush(io); close(io)
+            redirect_stdout(o)
+            redirect_stderr(e)
+        end
     end
 end
 
