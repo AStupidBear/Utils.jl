@@ -188,7 +188,7 @@ end
 
 global required_files = []
 
-export @rrevise, @rinclude
+export rrevise, @rinclude
 
 macro rinclude(src)
     dir = dirname(string(__source__.file))
