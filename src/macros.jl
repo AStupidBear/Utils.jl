@@ -186,6 +186,23 @@ macro redirect(src, ex)
     end
 end
 
+global required_files = []
+
+export @rrevise, @rinclude
+
+macro rinclude(src)
+    dir = dirname(string(__source__.file))
+    path = joinpath(dir, src)
+    push!(required_files, (__module__, path))
+    esc(:(include($src)))
+end
+
+function rrevise()
+    for (mdl, src) in required_files
+        @eval mdl include($src)
+    end
+end
+
 # using Lazy: isexpr, rmlines, splitswitch
 # export @switch
 # macro switch(args...)
