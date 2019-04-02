@@ -1,6 +1,14 @@
 export pmapreduce
 pmapreduce(f, op, iter) = reduce(op, pmap(f, iter))
 
+export workernodes
+function workernodes()
+    f = n -> remotecall_fetch(gethostname, n)
+    hosts = [(n, f(n)) for n in workers()]
+    sort!(hosts, by = reverse)
+    nodes = first.(unique(last, hosts))
+end
+
 export @everynode
 macro everynode(ex)
     quote
