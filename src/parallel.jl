@@ -9,8 +9,8 @@ function headnodes()
     nodes = first.(unique(last, hosts))
 end
 
-export threadworkers
-function threadworkers()
+export localworkers
+function localworkers()
     f = n -> remotecall_fetch(gethostname, n)
     pool = [n for n in workers() if f(n) == gethostname()]
 end
