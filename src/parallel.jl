@@ -1,12 +1,18 @@
 export pmapreduce
 pmapreduce(f, op, iter) = reduce(op, pmap(f, iter))
 
-export workernodes
-function workernodes()
+export headnodes
+function headnodes()
     f = n -> remotecall_fetch(gethostname, n)
     hosts = [(n, f(n)) for n in workers()]
     sort!(hosts, by = reverse)
     nodes = first.(unique(last, hosts))
+end
+
+export threadworkers
+function threadworkers()
+    f = n -> remotecall_fetch(gethostname, n)
+    pool = [n for n in workers() if f(n) == gethostname()]
 end
 
 export @everynode
