@@ -1,7 +1,7 @@
 using Reexport, Requires
 
 @reexport using Printf, Mmap, Serialization, LinearAlgebra, Dates, Statistics
-@reexport using Distributed, Random, DelimitedFiles, SparseArrays
+@reexport using Distributed, Random, DelimitedFiles, SparseArrays, Combinatorics
 
 @reexport using Parameters
 @reexport using MacroTools
