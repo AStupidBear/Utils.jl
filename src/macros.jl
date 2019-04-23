@@ -1,19 +1,3 @@
-export @print
-macro print(exs...)
-    str = join(["$ex = %.2f " for ex in exs], ", ")
-    esc(:(@printf($str, $(expr...))))
-end
-
-macro debug(ex)
-    x = gensym()
-    :($x = $ex; debug($x); $x) |> esc
-end
-
-macro info(ex)
-    x = gensym()
-    :($x = $ex; info($x); $x) |> esc
-end
-
 export @repeat
 macro repeat(n, ex)
     Expr(:block, (ex for i in 1:n)...) |> esc
@@ -126,12 +110,12 @@ end
 
 export @ignore
 macro ignore(ex)
-    :(try $ex; catch e; warn(e); end) |> esc
+    :(try $ex; catch e; @warn(e); end) |> esc
 end
 
 export @catcherr
 macro catcherr(ex)
-    :(try $ex; catch e; warn(e); return; end) |> esc
+    :(try $ex; catch e; @warn(e); return; end) |> esc
 end
 
 export @correct
@@ -143,7 +127,7 @@ end
 export ntry
 macro ntry(ex, n = 1000)
     :(for t in 1:$n
-        try $ex; break; catch e; warn(e); end
+        try $ex; break; catch e; @warn(e); end
     end) |> esc
 end
 
