@@ -187,6 +187,11 @@ function rrevise()
     end
 end
 
+export @gc
+macro gc(exs...)
+    Expr(:block, [:($ex = 0) for ex in exs]..., :(@eval GC.gc(true))) |> esc
+end
+
 # using Lazy: isexpr, rmlines, splitswitch
 # export @switch
 # macro switch(args...)
