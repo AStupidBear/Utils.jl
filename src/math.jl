@@ -101,7 +101,7 @@ export ⧶
 ⧶(x, y::Integer) = ifelse(x == y == 0, zero(x), x / y)
 
 export allequal
-all(x) = all(identity, x)
+allequal(x) = allequal(identity, x)
 
 function allequal(f, x)
     length(x) < 2 && return true
