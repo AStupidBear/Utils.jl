@@ -192,6 +192,17 @@ macro gc(exs...)
     Expr(:block, [:($ex = 0) for ex in exs]..., :(@eval GC.gc(true))) |> esc
 end
 
+export @staticvar
+macro staticvar(init)
+    var = gensym()
+    __module__.eval(:(const $var = $init))
+    var = esc(var)
+    quote
+        global $var
+        $var
+    end
+end
+
 # using Lazy: isexpr, rmlines, splitswitch
 # export @switch
 # macro switch(args...)
