@@ -206,7 +206,7 @@ end
 export @staticvar
 macro staticvar(ex)
     @capture(ex, name_::T_ = val_) || error("invalid @staticvar")
-    ref = Ref{eval(T)}()
+    ref = Ref{__module__.eval(T)}()
     set = Ref(false)
     :($(esc(name)) = if $set[]
         $ref[]
