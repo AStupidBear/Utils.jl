@@ -192,8 +192,8 @@ macro gc(exs...)
     Expr(:block, [:($ex = 0) for ex in exs]..., :(@eval GC.gc(true))) |> esc
 end
 
-export @staticvar
-macro staticvar(init)
+export @staticconst
+macro staticconst(init)
     var = gensym()
     __module__.eval(:(const $var = $init))
     var = esc(var)
@@ -201,6 +201,20 @@ macro staticvar(init)
         global $var
         $var
     end
+end
+
+export @staticvar
+macro staticvar(ex)
+    @capture(ex, name_::T_ = val_) || error("invalid @staticvar")
+    ref = Ref{eval(T)}()
+    set = Ref(false)
+    :($(esc(name)) = if $set[]
+        $ref[]
+    else
+        $ref[] = $(esc(ex))
+        $set[] = true
+        $ref[]
+    end)
 end
 
 # using Lazy: isexpr, rmlines, splitswitch
