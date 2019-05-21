@@ -192,8 +192,8 @@ macro gc(exs...)
     Expr(:block, [:($ex = 0) for ex in exs]..., :(@eval GC.gc(true))) |> esc
 end
 
-export @staticconst
-macro staticconst(init)
+export @staticvar
+macro staticvar(init)
     var = gensym()
     __module__.eval(:(const $var = $init))
     var = esc(var)
@@ -203,8 +203,8 @@ macro staticconst(init)
     end
 end
 
-export @staticvar
-macro staticvar(ex)
+export @staticdef
+macro staticdef(ex)
     @capture(ex, name_::T_ = val_) || error("invalid @staticvar")
     ref = Ref{__module__.eval(T)}()
     set = Ref(false)
