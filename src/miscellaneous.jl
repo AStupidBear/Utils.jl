@@ -39,6 +39,8 @@ function pkill(name)
     end
 end
 
+Base.Dict(;kws...) = Dict(kws...)
+
 # function Base.edit(path::AbstractString, line::Integer=0)
 #     command = Base.editor()
 #     name = basename(first(command))
