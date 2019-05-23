@@ -39,8 +39,8 @@ function pkill(name)
     end
 end
 
-export kw2dict
-kw2dict(;kws...) = Dict(kws...)
+export kws2dict
+kws2dict(;kws...) = Dict(kws...)
 
 # function Base.edit(path::AbstractString, line::Integer=0)
 #     command = Base.editor()
