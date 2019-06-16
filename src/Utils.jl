@@ -27,7 +27,6 @@ include("iterators.jl")
 include("hash.jl")
 include("mmap.jl")
 include("fillna.jl")
-include("string.jl")
 include("pycall.jl")
 
 end # End of Utils
