@@ -44,7 +44,7 @@ a = 1; b = 2
 d = @strdict(a, b)
 """
 macro strdict(exs...)
-    expr = Expr(:block,:(d = Dict{Symbol, Any}()))
+    expr = Expr(:block,:(d = Dict{String, Any}()))
     for ex in exs
         push!(expr.args,:(d[$(string(ex))] = $(esc(ex))))
     end
