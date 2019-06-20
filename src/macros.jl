@@ -30,7 +30,7 @@ a = 1; b = 2
 d = @symdict(a, b)
 """
 macro symdict(exs...)
-    expr = Expr(:block,:(d = Dict()))
+    expr = Expr(:block,:(d = Dict{Symbol, Any}()))
     for ex in exs
         push!(expr.args,:(d[$(QuoteNode(ex))] = $(esc(ex))))
     end
@@ -44,7 +44,7 @@ a = 1; b = 2
 d = @strdict(a, b)
 """
 macro strdict(exs...)
-    expr = Expr(:block,:(d = Dict()))
+    expr = Expr(:block,:(d = Dict{Symbol, Any}()))
     for ex in exs
         push!(expr.args,:(d[$(string(ex))] = $(esc(ex))))
     end
