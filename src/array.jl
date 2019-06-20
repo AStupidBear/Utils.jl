@@ -5,7 +5,7 @@ rowvec(x) = reshape(x, 1, length(x))
 Base.delete!(a::Array, val) = deleteat!(a, findfirst(a, val))
 
 export deleteall!, remove!, removeall!
-deleteall!(a::Array, val)  = deleteat!(a, find(x -> x==val, a))
+deleteall!(a::Array, val)  = deleteat!(a, find(x -> x == val, a))
 remove!(a::Array, val) = delete!(a, val)
 removeall!(a::Array, val) = deleteall!(a, val)
 
@@ -65,21 +65,10 @@ Base.transpose(x::Tuple) = transpose.(x)
 ccount(x::Tuple) = ccount(x[1])
 rcount(x::Tuple) = rcount(x[1])
 
-@static if VERSION < v"1.1"
-    export eachrow, eachcol, eachslice
-    eachrow(x::AbstractArray{T, N}) where {T, N} = eachslice(x, Val{1})
-    eachcol(x::AbstractArray{T, N}) where {T, N} = eachslice(x, Val{N})
-    @generated function eachslice(x::AbstractArray{T, N}, ::Type{Val{D}}) where {T, N, D}
-        t = ntuple(i -> i == D ? (*) : (:), Val(N))
-        :(JuliennedArrays.julienne(x, $t))
-    end
-end
-
-@static if VERSION < v"1.0"
-    Base.start(x::Nothing) = 0
-    Base.done(x::Nothing, n::Int64) = true
-    Base.length(x::Nothing) = 0
-    Base.step(x::AbstractArray) = mean(diff(x))
+_view(x, idx1, idx2, D) = (view(x, idx1..., i, idx2...) for i in axes(x, D))
+@generated function Base.eachslice(x::AbstractArray{T, N}, ::Type{Val{D}}) where {T, N, D}
+    idx1, idx2 = ntuple(d -> (:), D - 1), ntuple(d -> (:), N - D)
+    :(_view(x, $idx1, $idx2, $D))
 end
 
 export unsqueeze
@@ -104,31 +93,13 @@ end
 export stack, unstack
 stack(xs::Vector{<:AbstractArray}, dim::Integer) = cat(unsqueeze.(xs, dim), dim)
 unstack(xs, dim::Integer) = [copy(selectdim(xs, dim, i)) for i in 1:size(xs, dim)]
-@static if VERSION >= v"0.7"
-    stack(xs::AbstractArray...; dims) = stack(collect(xs), dims)
-else
-    stack(xs::AbstractArray...; dims = 1) = stack(collect(xs), dims)
-end
+stack(xs::AbstractArray...; dims) = stack(collect(xs), dims)
 
 export cstack, rstack
 cstack(xs::Vector{<:AbstractArray}) = stack(xs, ndims(first(xs)) + 1)
 rstack(xs::Vector{<:AbstractArray}) = stack(xs, 1)
 cstack(xs::AbstractArray...) = cstack(collect(xs))
 rstack(xs::AbstractArray...) = rstack(collect(xs))
-
-# x = rand(2, 2)
-# y = rand(2, 2)
-# stack(3, x, y) == stack([x, y], 3) == cstack(x, y) == cstack([x, y])
-
-# function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
-#     fill!(y, zero(eltype(y)))
-#     for col in 1:length(colptr)-1
-#         xc = x[col]
-#         @inbounds for s = colptr[col] : (colptr[col+1]-1)
-#             y[I[s]] += A[s] * xc
-#         end
-#     end
-# end
 
 export zeroel, oneel
 zeroel(x) = zero(eltype(x))
@@ -140,3 +111,13 @@ countunique(itr) = length(Set(itr))
 export rreshape, creshape
 rreshape(x) = reshape(x, size(x, 1), :)
 creshape(x) = reshape(x, :, size(x)[end])
+
+# function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
+#     fill!(y, zero(eltype(y)))
+#     for col in 1:length(colptr)-1
+#         xc = x[col]
+#         @inbounds for s = colptr[col] : (colptr[col+1]-1)
+#             y[I[s]] += A[s] * xc
+#         end
+#     end
+# end
