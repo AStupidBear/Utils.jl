@@ -3,7 +3,7 @@ plus(x::Real) = ifelse(x > 0, one(x), zero(x))
 minus(x::Real) = ifelse(x < 0, oftype(x, -1), zero(x))
 
 export sign
-Base.sign(x::Real, Θ) = ifelse(x < -Θ, oftype(x, -1), ifelse(x > Θ, one(x), zero(x)))
+Base.sign(x::Real, Θ) = ifelse(x < -Θ, oftype(x, -1), ifelse(x > Θ, one(x), ifelse(isnan(x), x, zero(x))))
 
 "pf = piecewise(:x,:([x>0, x==0, x<0]), :([2*x, -1, -x]))"
 function piecewise(x::Symbol, c::Expr, f::Expr)
