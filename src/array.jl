@@ -112,6 +112,8 @@ export rreshape, creshape
 rreshape(x) = reshape(x, size(x, 1), :)
 creshape(x) = reshape(x, :, size(x)[end])
 
+Base.dropdims(f, A::AbstractArray; dims) = dropdims(f(A, dims = dims), dims = dims)
+
 # function sp_A_mul_B!(y, rowptr, colptr, I, J, A, x)
 #     fill!(y, zero(eltype(y)))
 #     for col in 1:length(colptr)-1
