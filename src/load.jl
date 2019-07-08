@@ -1,6 +1,6 @@
 using Reexport, Requires
 
-@reexport using Printf, Mmap, Serialization, LinearAlgebra, Dates, Statistics
+@reexport using Printf, Mmap, Serialization, LinearAlgebra, Dates, Statistics, Logging
 @reexport using Distributed, Random, DelimitedFiles, SparseArrays, Combinatorics
 
 @reexport using Parameters
