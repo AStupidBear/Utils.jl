@@ -95,6 +95,7 @@ Base.sum(f::Function, v0::Number, iter) = mapreduce(f, +, v0, iter)
 
 Base.maximum(f::Function, v0::Number, iter) = isempty(iter) ? v0 : maximum(f, iter)
 
+# dsol
 export ⧶
 ⧶(x, y) = x / y
 ⧶(x, y::AbstractFloat) = x / (y + eps(y))
