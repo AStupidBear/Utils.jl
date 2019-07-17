@@ -42,6 +42,9 @@ end
 export kws2dict
 kws2dict(;kws...) = Dict(kws...)
 
+export inverse
+inverse(d::AbstractDict) = Dict(v => k for (k, v) in d)
+
 # function Base.edit(path::AbstractString, line::Integer=0)
 #     command = Base.editor()
 #     name = basename(first(command))
