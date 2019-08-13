@@ -17,7 +17,7 @@ Base.vcat(xs::Tuple...) = map(vcat, xs...)
 Base.hcat(xs::Tuple...) = map(hcat, xs...)
 
 export splat
-splat(list) = [item for sublist in list for item in sublist]
+splat(list) = [item for sublist in list for item in (isa(sublist, AbstractArray) ? sublist : [sublist])]
 
 export csize, rsize
 csize(a) = (ndims(a) == 1 ? size(a) : size(a)[1:end-1])
