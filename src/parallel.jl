@@ -26,10 +26,10 @@ end
 export inmpi
 function inmpi()
     try
-        pstree = read(`pstree -s $(getpid())`, String)
-        occursin("mpi", pstree) || occursin("slurm", pstree)
+        ps = read(`pstree -s $(getpid())`, String)
+        occursin("mpi", ps) || occursin("slurm", ps)
     catch
-        !Sys.iswindows()
+        occursin("mpi", join(processname.(pstree())))
     end
 end
 

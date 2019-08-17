@@ -14,13 +14,29 @@ function parseenv(key, default::T) where T
 end
 
 export getppid
-function getppid()
-    @static if Sys.iswindows()
-        str = read(`wmic process where processid=$(getpid()) get parentprocessid`, String)
-        parse(Int, match(r"\d+", str).match)
-    else
-        parse(Int, strip(read(`ps -o ppid= -p $(getpid())`, String)))
+function getppid(pid = getpid())
+    try
+        @static if Sys.iswindows()
+            pip = pipeline(`wmic process where processid=$pid get parentprocessid`, stderr = devnull)
+            str = read(pip, String)
+            parse(Int, match(r"\d+", str).match)
+        else
+            pip = pipeline(`ps -o ppid= -p $pid`, stderr = devnull)
+            parse(Int, strip(read(pip, String)))
+        end
+    catch
+        nothing
     end
+end
+
+function pstree(pid = getpid())
+    pids = Int[]
+    while !isnothing(pid)
+        push!(pids, pid)
+        pid = getppid(pid)
+    end
+    pop!(pids)
+    return pids
 end
 
 export processname
