@@ -13,6 +13,25 @@ function parseenv(key, default::T) where T
     end
 end
 
+export getppid
+function getppid()
+    @static if Sys.iswindows()
+        str = read(`wmic process where processid=$(getpid()) get parentprocessid`, String)
+        parse(Int, match(r"\d+", str).match)
+    else
+        parse(Int, strip(read(`ps -o ppid= -p $(getpid())`, String)))
+    end
+end
+
+export processname
+function processname(pid)
+    @static if Sys.iswindows()
+        split(read(`wmic process where processid=$pid get executablepath`, String))[end]
+    else
+        strip(read(`ps -p $pid -o comm=`, String))
+    end
+end
+
 # """cron("spam.jl", 1)"""
 # function cron(fn, repeat)
 #     name = splitext(fn)[1]
