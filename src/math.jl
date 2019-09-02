@@ -75,7 +75,7 @@ export pctchange
 function pctchange(x, T)
     ϵ = eps(eltype(x))
     z = zero(x)
-    for t in linearindices(x)
+    for t in 1:length(x)
         t′ = clamp(t - T, 1, length(x))
         t1, t2 = minmax(t, t′)
         z[t] = (x[t2] - x[t1]) / (x[t1] + ϵ)
