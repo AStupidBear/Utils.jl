@@ -45,6 +45,10 @@ kws2dict(;kws...) = Dict(kws...)
 export inverse
 inverse(d::AbstractDict) = Dict(v => k for (k, v) in d)
 
+export todict, tostruct
+todict(x) = Dict{Symbol, Any}(s => getfield(data, s) for s in fieldnames(typeof(x)))
+tostruct(::Type{T}, d) where T = T([d[s] for s in fieldnames(T)]...)
+
 # function Base.edit(path::AbstractString, line::Integer=0)
 #     command = Base.editor()
 #     name = basename(first(command))
