@@ -1,13 +1,14 @@
-using Base: SummarySize
+using Base: SummarySize, SimpleVector
 
 export memoryhash
 
 function memoryhash(obj;
-                     exclude = Union{DataType, TypeName, Method},
-                     chargeall = Union{TypeMapEntry, Core.MethodInstance})
-    h = UInt(0)
-    ss = SummarySize(ObjectIdDict(), Any[], Int[], exclude, chargeall)
+                     exclude = Union{DataType, Core.TypeName, Core.MethodInstance},
+                     chargeall = Union{Core.TypeMapEntry, Method})
+    @nospecialize obj exclude chargeall
+    ss = SummarySize(IdDict(), Any[], Int[], exclude, chargeall)
     size::Int = ss(obj)
+    h = UInt(0)
     while !isempty(ss.frontier_x)
         # DFS heap traversal of everything without a specialization
         # BFS heap traversal of anything with a specialization
@@ -27,7 +28,7 @@ function memoryhash(obj;
         else
             nf = nfields(x)
             ft = typeof(x).types
-            if !isbits(ft[i]) && isdefined(x, i)
+            if !isbitstype(ft[i]) && isdefined(x, i)
                 val = getfield(x, i)
             end
         end
@@ -38,7 +39,6 @@ function memoryhash(obj;
             pop!(ss.frontier_i)
         end
         if val !== nothing && !isa(val, Module) && (!isa(val, ss.exclude) || isa(x, ss.chargeall))
-            size += ss(val)::Int
             h = hash(hash(val), h)
         end
     end
