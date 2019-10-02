@@ -42,7 +42,10 @@ function scc_start()
     if !inmpi()
         @eval Main macro mpi_do(mgr, expr) esc(expr) end
     else
-        @eval Main (using MPI; mngr = MPI.start_main_loop(MPI.MPI_TRANSPORT_ALL))
+        @eval Main begin
+            using MPI, MPIClusterManagers
+            mngr = MPIClusterManagers.start_main_loop(MPI.MPI_TRANSPORT_ALL)
+        end
     end
 end
 
