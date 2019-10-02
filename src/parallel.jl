@@ -53,6 +53,7 @@ export scc_end
 function scc_end()
     isdefined(Main, :MPI) && @eval Main begin
         MPI.stop_main_loop(mngr)
+        exit()
     end
 end
 
