@@ -44,7 +44,8 @@ function scc_start()
     else
         @eval Main begin
             using MPI, MPIClusterManagers
-            mngr = MPIClusterManagers.start_main_loop(MPI.MPI_TRANSPORT_ALL)
+            using MPIClusterManagers: start_main_loop, MPI_TRANSPORT_ALL
+            mngr = start_main_loop(MPI_TRANSPORT_ALL)
         end
     end
 end
