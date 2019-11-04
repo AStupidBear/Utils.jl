@@ -44,8 +44,9 @@ function scc_start()
     else
         @eval Main begin
             using MPI, MPIClusterManagers
-            using MPIClusterManagers: start_main_loop, MPI_TRANSPORT_ALL
-            mngr = start_main_loop(MPI_TRANSPORT_ALL)
+            using MPIClusterManagers: @mpi_do
+            const MCM = MPIClusterManagers
+            mngr = MCM.start_main_loop(MCM.MPI_TRANSPORT_ALL)
         end
     end
 end
@@ -53,8 +54,7 @@ end
 export scc_end
 function scc_end()
     isdefined(Main, :MPI) && @eval Main begin
-        using MPIClusterManagers: stop_main_loop
-        stop_main_loop(mngr); exit()
+        MCM.stop_main_loop(mngr); exit()
     end
 end
 
