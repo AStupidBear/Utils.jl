@@ -49,7 +49,7 @@ export @bash_str
 # """
 # ```
 macro bash_str(str, exe = "run")
-    :(bash($str, $(symbol(exe))))
+    :(bash($str, $(Symbol(exe))))
 end
 
 export bash
